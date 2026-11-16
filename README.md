@@ -16,8 +16,10 @@ plane: roda nas máquinas, aceita ou recusa ofertas, prepara pacote e runtime, e
 
 ## Primeiro uso
 
-1. Prepare a máquina com `.\scripts\portal.ps1 setup` (requisitos em `docs/visao-geral.md`).
-2. Suba o Portal com `.\scripts\portal.ps1 start`.
+1. Prepare a máquina com `.\scripts\portal.ps1 setup` no Windows ou `sudo ./scripts/portal.sh setup` no Linux
+   (requisitos em `docs/visao-geral.md`).
+2. Suba o Portal com `.\scripts\portal.ps1 start` ou `sudo ./scripts/portal.sh start` (serviços do systemd, que
+   voltam sozinhos quando o servidor reinicia).
 3. Acesse `http://localhost:3000` e entre com o administrador criado no primeiro início (veja `backend/README.md`).
 
 ## Stack
@@ -25,3 +27,4 @@ plane: roda nas máquinas, aceita ou recusa ofertas, prepara pacote e runtime, e
 - `backend/`: FastAPI, SQLAlchemy, Alembic, PostgreSQL, Redis, Celery, armazenamento local ou S3 e gateway do Agent.
 - `frontend/`: Next.js, TypeScript e Tailwind.
 - `scripts/portal.ps1`: instala, sobe e derruba o Portal nativamente no Windows.
+- `scripts/portal.sh`: o mesmo no Linux, com os serviços no systemd (`portal-automacoes.target`).

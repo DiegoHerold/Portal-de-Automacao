@@ -97,8 +97,27 @@ def test_rejection_is_not_modeled_as_automation_failure() -> None:
 def test_decisions_keep_every_adr_number() -> None:
     decisoes = read(DOCS / "decisoes.md")
 
-    for numero in range(1, 22):
+    for numero in range(1, 23):
         assert f"| {numero:03d} |" in decisoes, f"ADR-{numero:03d}"
+
+
+def test_portal_runs_on_windows_and_linux_with_the_same_commands() -> None:
+    import re
+
+    ps1 = read(ROOT / "scripts" / "portal.ps1")
+    sh_bytes = (ROOT / "scripts" / "portal.sh").read_bytes()
+    sh = sh_bytes.decode("utf-8")
+
+    # Com CRLF o bash do Linux nao roda o script; o .gitattributes garante LF no checkout.
+    assert b"\r" not in sh_bytes
+    assert re.search(r"^\*\.sh\s+text\s+eol=lf", read(ROOT / ".gitattributes"), re.M)
+
+    comandos_ps1 = set(re.search(r"ValidateSet\(([^)]*)\)", ps1).group(1).replace("'", "").replace(" ", "").split(","))
+    comandos_sh = set(re.findall(r"^\s{4}([a-z-]+)\) cmd_", sh, re.M))
+    assert comandos_ps1 <= comandos_sh, comandos_ps1 - comandos_sh
+    for servico in ("postgres", "migrate", "api", "worker", "beat", "frontend"):
+        assert f"$PREFIX-{servico}.service" in sh, servico
+    assert "User=$PORTAL_USER" in sh
 
 
 def test_modular_monolith_context_directories_exist() -> None:

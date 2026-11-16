@@ -10,8 +10,8 @@ oficial de estado.
 
 ## Rodando localmente
 
-Para o Portal completo, use `..\scripts\portal.ps1` (ver
-`../docs/visao-geral.md`). Para desenvolver so a API, depois do `setup`:
+Para o Portal completo, use `..\scripts\portal.ps1` no Windows ou
+`../scripts/portal.sh` no Linux com systemd (ver `../docs/visao-geral.md`). Para desenvolver so a API, depois do `setup`:
 
 1. Pare a API gerenciada se ela estiver no ar.
 2. Rode `.venv\Scripts\python -m uvicorn main:app --reload`.

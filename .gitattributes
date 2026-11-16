@@ -1,0 +1,2 @@
+# Scripts de shell sempre com LF: com CRLF o bash do Linux nao roda (scripts/portal.sh).
+*.sh text eol=lf
