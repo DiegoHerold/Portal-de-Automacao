@@ -2,12 +2,12 @@
 <#
 .SYNOPSIS
     Single entry point for the Portal-Agent certification harness
-    (docs/certification-harness.md, docs/runbooks/portal-agent-certification.md).
+    (automation-agent/docs/certification-harness.md, automation-agent/docs/portal-agent-certification.md).
 
 .DESCRIPTION
     Thin wrapper around `dotnet run --project automation-agent/tools/Certification.Cli`.
     Exists so the whole harness can be driven with one command instead of a
-    list of manual steps (docs/certification-harness.md item 76).
+    list of manual steps (automation-agent/docs/certification-harness.md item 76).
 
 .EXAMPLE
     .\scripts\certification.ps1 prepare

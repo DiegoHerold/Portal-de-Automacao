@@ -10,7 +10,7 @@ dist/
 backend/data/
 coverage/
 
-# Certification harness runtime data (docs/certification-harness.md).
+# Certification harness runtime data (automation-agent/docs/certification-harness.md).
 # Generated agent SQLite/runtime/package store, run logs, and reports —
 # reproducible from `certification prepare` + `certification run`, and may
 # transiently contain machine-local paths. Never contains committed
@@ -21,3 +21,10 @@ automation-agent/certification-runs/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.next-e2e/
+frontend/.next-e2e-*/
+*.tsbuildinfo
+
+# Saídas de ferramentas (logs e resultados locais)
+.playwright-cli/
+automation-agent/TestResults/
+automation-agent/diag/

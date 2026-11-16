@@ -22,7 +22,7 @@ import { durationSummary, plannedRangeLabel } from "@/lib/schedule-duration";
 import { scheduleStatusMeta, temporalStatusMeta } from "@/lib/status";
 import { formatDateTime } from "@/lib/utils";
 import type { Automation } from "@/types/automation";
-import type { Flow } from "@/types/flow";
+import type { FluxoAgendavel as Flow } from "@/types/schedule";
 import type { Schedule, ScheduleCalendarItem, ScheduleExecution } from "@/types/schedule";
 
 type Action = "enable" | "pause" | "disable" | "archive" | "trigger";
@@ -278,10 +278,10 @@ function ScheduleTab({ schedule }: { schedule: Schedule }) {
 }
 
 function ExecutionTab({ item }: { item: ScheduleCalendarItem | null }) {
-  if (!item || (!item.execution_id && !item.flow_execution_id)) {
+  if (!item || !item.execution_id) {
     return <p className="text-sm text-muted-foreground">Esta ocorrência ainda não criou uma execução.</p>;
   }
-  const href = item.flow_execution_id ? `/flow-executions/${item.flow_execution_id}` : `/executions/${item.execution_id}`;
+  const href = `/executions/${item.execution_id}`;
   return (
     <div className="space-y-4">
       <DetailGrid

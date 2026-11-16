@@ -50,7 +50,7 @@ import {
 import { cn, formatDateTime, formatDuration, relativeFromNow } from "@/lib/utils";
 import type { Automation } from "@/types/automation";
 import type { Execution } from "@/types/execution";
-import type { TaskExecution } from "@/types/flow";
+import type { TaskExecution } from "@/types/execution";
 import type { Worker } from "@/types/worker";
 
 type DispatchQueueResponse = { items: TaskExecution[] };

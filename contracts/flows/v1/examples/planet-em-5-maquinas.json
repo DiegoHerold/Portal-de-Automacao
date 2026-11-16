@@ -1,0 +1,47 @@
+{
+  "contrato": "fluxo/v1",
+  "entradas": [
+    { "nome": "empresa", "tipo": "texto", "obrigatoria": true, "rotulo": "Empresa" },
+    { "nome": "arquivos", "tipo": { "lista": "texto" }, "obrigatoria": true, "rotulo": "Arquivos TXT" }
+  ],
+  "variaveis": [
+    { "nome": "resultado", "tipo": "resultado" },
+    { "nome": "tentativas", "tipo": "numero" }
+  ],
+  "corpo": [
+    { "id": "b1", "tipo": "dividir_automacao", "automacao": "integracao_contabil", "modo": "fatias",
+      "item": { "tipo": "entrada", "nome": "empresa" }, "fatias": { "tipo": "entrada", "nome": "arquivos" },
+      "partes": 5, "guardar_em": "resultado" },
+    { "id": "b2", "tipo": "definir", "variavel": "tentativas", "valor": { "tipo": "numero", "valor": 0 } },
+    { "id": "b3", "tipo": "enquanto",
+      "condicao": { "tipo": "op", "op": "e",
+        "a": { "tipo": "nao", "a": { "tipo": "fn", "nome": "vazio", "args": [
+          { "tipo": "campo", "de": { "tipo": "var", "nome": "resultado" }, "campo": "fatias_com_erro" }] } },
+        "b": { "tipo": "op", "op": "<", "a": { "tipo": "var", "nome": "tentativas" }, "b": { "tipo": "numero", "valor": 2 } } },
+      "corpo": [
+        { "id": "b4", "tipo": "dividir_automacao", "automacao": "integracao_contabil", "modo": "fatias",
+          "item": { "tipo": "entrada", "nome": "empresa" },
+          "fatias": { "tipo": "campo", "de": { "tipo": "var", "nome": "resultado" }, "campo": "fatias_com_erro" },
+          "partes": 5, "guardar_em": "resultado" },
+        { "id": "b5", "tipo": "alterar", "variavel": "tentativas", "por": { "tipo": "numero", "valor": 1 } }
+      ] },
+    { "id": "b6", "tipo": "se", "casos": [{
+      "condicao": { "tipo": "nao", "a": { "tipo": "fn", "nome": "vazio", "args": [
+        { "tipo": "campo", "de": { "tipo": "var", "nome": "resultado" }, "campo": "fatias_com_erro" }] } },
+      "corpo": [
+        { "id": "b7", "tipo": "perguntar", "para": { "tipo": "quem_executou" },
+          "pergunta": { "tipo": "texto", "valor": "Sobraram arquivos com erro. O que fazer?" },
+          "opcoes": [
+            { "rotulo": "tentar de novo", "corpo": [
+              { "id": "b8", "tipo": "esperar", "segundos": { "tipo": "numero", "valor": 300 } },
+              { "id": "b9", "tipo": "dividir_automacao", "automacao": "integracao_contabil", "modo": "fatias",
+                "item": { "tipo": "entrada", "nome": "empresa" },
+                "fatias": { "tipo": "campo", "de": { "tipo": "var", "nome": "resultado" }, "campo": "fatias_com_erro" },
+                "partes": 5, "guardar_em": "resultado" }] },
+            { "rotulo": "encerrar", "corpo": [
+              { "id": "b10", "tipo": "falhar", "motivo": { "tipo": "texto", "valor": "Encerrado com arquivos pendentes" } }] }
+          ] }
+      ] }] },
+    { "id": "b11", "tipo": "concluir", "valor": { "tipo": "campo", "de": { "tipo": "var", "nome": "resultado" }, "campo": "total_ok" } }
+  ]
+}

@@ -1,8 +1,7 @@
 # Design System — Portal de Automações
 
-Status: vigente para UI atual. Os nomes visuais `Job` e `Worker` continuam
-temporariamente por compatibilidade, mas a UX deve migrar para `Execution`,
-`TaskExecution`, `Agent` e `AgentInstance` conforme `docs/migration.md`.
+Status: vigente. Na interface use "Máquina", "Agent" e "Execução"; "Worker" e "Job" só aparecem em nomes
+internos do código, por compatibilidade. O que cada aba faz está em [telas/](telas/).
 
 Guia da camada visual do frontend. Direção: **identidade Biason** (ADR-020) —
 navy da marca, névoa como acento, Arial no texto e nos títulos
@@ -51,7 +50,7 @@ tokens. A faixa de resumo do topo (`.faixa-noite`) também segue o tema: veja ab
 - **Menu lateral por categoria** (`lib/navigation.ts`): Monitorar (Painel, Fila, Máquinas,
   Histórico), Operação (Execuções, Fluxos, Webhooks, Agendamentos), Catálogo (Automações,
   Categorias, Runtimes) e Infraestrutura (Agents). Por padrão o menu vai **até Agents**, sem
-  rolagem num notebook de 1366×768 (teste `menu lateral` em `e2e/fase5.spec.ts`).
+  rolagem num notebook de 1366×768 (teste `menu lateral` em `frontend/e2e/fase5.spec.ts`).
 - **Configurações** (`settings-panel.tsx`) em abas, com a aba no endereço (`#menu`,
   `#notificacoes`, `#conta`, `#sistema`): **Menu e atalhos** lista **todas** as áreas que a pessoa
   pode abrir, por categoria e na ordem do menu, cada uma com uma frase do que faz, o atalho e a
@@ -197,7 +196,7 @@ Histórico para uma execução.
   (`lib/fila.ts::duracao`). Número em Arial, visível na linha — não em
   tooltip.
 - **"Sem previsão" nunca aparece sozinho.** Vem sempre com cada motivo que se
-  aplica, em `warning`, logo abaixo da linha (decisão 2 da Fase 0). Os textos vêm
+  aplica, em `warning`, logo abaixo da linha. Os textos vêm
   do backend; a tela só capitaliza a primeira letra.
 - Estimativa parcial: "pelo menos ~ 9 min" + as etapas sem histórico.
 - Ações que mudam a fila (cancelar, continuar, recomeçar) abrem confirmação que
@@ -302,7 +301,6 @@ números e a seção "Máquinas" do pé saíram: o que elas mostravam está nas 
   - o cadastro não tem senha: um aviso diz que a pessoa recebe o convite;
   - quem não criou a senha aparece como "Aguardando criar senha";
   - o ícone de chave manda o link de novo.
-- Telas em `docs/login-telas/`.
 
 ## Papéis globais (regra de tela, 12/11/2026)
 
@@ -369,13 +367,44 @@ números e a seção "Máquinas" do pé saíram: o que elas mostravam está nas 
   - **Do item**: tudo o que já aconteceu com aquele recurso.
 - Clicar num evento relacionado abre esse evento no painel.
 
+## Fluxos: editor em cartões (regra de tela, 13/11/2026)
+
+Padrão do Power Automate com a identidade do Portal (ADR-021). Como funciona: [telas/fluxos.md](telas/fluxos.md).
+
+- **Coluna de cartões** centrada sobre o fundo `background` com pontilhado discreto. Cartão: `card`, borda
+  `border`, raio 12px, sombra leve; selecionado: borda `primary` com anel. Fluxo largo rola para a direita.
+- **Anatomia do cartão**: quadrado de 34px com ícone `lucide` branco; nome em negrito `titulo`; resumo em
+  `muted-foreground` com **fichas** de valor (fundo névoa claro, texto marinho). "⋯" abre renomear, copiar, apagar.
+- **Cor só no quadrado do ícone**, por grupo: automação `primary`; decidir `info`; repetir/tentar `foreground`;
+  pessoas `warning`; dados `primary/70`; esperar/anotar `muted-foreground`; concluir `success`; falhar `destructive`
+  (só tokens: o tema escuro troca sozinho; mapa em `frontend/src/lib/fluxos/catalogo.ts`). O cartão é sempre branco.
+- **"+" entre os passos** (círculo de 26px sobre a linha `nevoa`) abre **Adicionar um passo**: busca, abas
+  (Automações, Decidir, Repetir, Pessoas, Dados, Fim) e ações em grade de 2 colunas, cada uma com uma frase didática.
+- **Ramos lado a lado** em caixas tracejadas névoa: Condição (Sim · Não), Perguntar (um por resposta),
+  Tentar (Tentar · Se falhar). **Laços** contêm os passos numa caixa "Faça". Ramo vazio: "Nenhum passo" e "+".
+- **Painel à direita (360 a 420px)**: cabeçalho com ícone, nome e a frase do passo; formulário (seletor, segmentos,
+  contador, campo com fichas) com ajuda curta embaixo de cada campo; aviso verde "Tudo certo" ou o erro do
+  passo; **Valores dinâmicos** no rodapé (entradas, variáveis, campos do resultado), clicáveis.
+- **Expressão nunca aparece como código**: vira frase ("arquivos com erro de resultado não está vazio e
+  tentativas é menor que 2"). Condição se edita em linhas "valor · operador · valor" com E/OU.
+- **Área de trabalho (16/11/2026)**: editor e tela ao vivo ocupam toda a área do Portal, sem margem nem "Voltar"
+  (`ehAreaDeTrabalho` no `AppShell`). Topo numa linha só (48px): ← para a lista, nome (clique renomeia), selos, salvo,
+  desfazer/refazer, Funções, Execuções, Executar, tela cheia e **Publicar versão** (principal). Rótulos das ações
+  secundárias somem em telas menores (fica o ícone com `aria-label`). **Tela cheia** esconde menu e topo do Portal
+  (lembrada por pessoa no navegador; Esc sai).
+- **Quadro** (`components/fluxos/editor/quadro.tsx`): Ctrl/⌘ + rolar (ou pinça) dá zoom no ponto do mouse (25% a
+  200%); rolar anda; Shift + rolar anda para os lados. Ferramentas **Seleção (V)** e **Mão (H)**; Espaço segurado e o
+  botão do meio viram a mão na hora; na Seleção, arrastar o fundo também move. Barra flutuante no canto inferior
+  esquerdo: ferramentas, −, %, +, Ajustar à tela (Shift 1); Ctrl 0 volta a 100%. Selecionar um cartão (ou focar
+  pelo teclado) traz o cartão para a vista; a tela ao vivo abre no passo atual.
+
 ## Testes de tela
 
 `frontend/e2e/` com Playwright (`npx playwright test`). A API é simulada **só
 dentro do teste** (`page.route`), apontando o frontend para um host `.invalid`;
 cada teste falha se houver erro no console. O servidor de teste usa
-`NEXT_DIST_DIR=.next-e2e` para nunca tocar no `.next` do build de produção. Os
-prints ficam em `docs/fase-N-telas/`.
+`NEXT_DIST_DIR=.next-e2e` para nunca tocar no `.next` do build de produção. As
+capturas dos testes ficam em `frontend/test-results/telas/` (fora do Git).
 
 ## Convenções
 

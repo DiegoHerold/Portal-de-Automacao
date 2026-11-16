@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portal.biason/contracts/flows/v1/fluxo.schema.json",
+  "title": "Fluxo em blocos (v1)",
+  "description": "Programa em blocos que usa automações como passos. Estrutura: este schema. Regras de sentido (variável declarada, tipos, laço sem saída, recursão): validador do Portal (backend/modules/orchestration/fluxos/domain/validador.py). Ver README.md.",
+  "type": "object",
+  "required": ["contrato", "corpo"],
+  "additionalProperties": false,
+  "properties": {
+    "contrato": { "const": "fluxo/v1" },
+    "entradas": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/entrada" } },
+    "variaveis": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/declaracao" } },
+    "funcoes": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/funcao" } },
+    "corpo": { "$ref": "#/$defs/corpo" }
+  },
+  "$defs": {
+    "nome": { "type": "string", "pattern": "^[a-z_][a-z0-9_]{0,59}$" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "tipo_de_valor": {
+      "oneOf": [
+        { "enum": ["texto", "numero", "booleano", "data", "objeto", "qualquer", "resultado"] },
+        { "type": "object", "required": ["lista"], "additionalProperties": false,
+          "properties": { "lista": { "$ref": "#/$defs/tipo_de_valor" } } }
+      ]
+    },
+    "entrada": {
+      "type": "object", "required": ["nome", "tipo"], "additionalProperties": false,
+      "properties": {
+        "nome": { "$ref": "#/$defs/nome" }, "tipo": { "$ref": "#/$defs/tipo_de_valor" },
+        "obrigatoria": { "type": "boolean" }, "rotulo": { "type": "string", "maxLength": 120 },
+        "descricao": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "declaracao": {
+      "type": "object", "required": ["nome", "tipo"], "additionalProperties": false,
+      "properties": { "nome": { "$ref": "#/$defs/nome" }, "tipo": { "$ref": "#/$defs/tipo_de_valor" } }
+    },
+    "funcao": {
+      "type": "object", "required": ["nome", "parametros", "retorno"], "additionalProperties": false,
+      "description": "Cálculo ou comparação reutilizável: recebe parâmetros e devolve uma expressão. Sem automação, sem efeito.",
+      "properties": {
+        "nome": { "$ref": "#/$defs/nome" }, "id": { "$ref": "#/$defs/id" },
+        "parametros": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/declaracao" } },
+        "retorno": { "$ref": "#/$defs/expressao" }, "tipo_retorno": { "$ref": "#/$defs/tipo_de_valor" }
+      }
+    },
+    "corpo": { "type": "array", "maxItems": 2000, "items": { "$ref": "#/$defs/comando" } },
+    "destino": {
+      "type": "object", "required": ["tipo"], "additionalProperties": false,
+      "properties": { "tipo": { "enum": ["time", "pessoa", "quem_executou"] }, "id": { "type": ["integer", "string"] } }
+    },
+    "argumentos": { "type": "object", "maxProperties": 50, "additionalProperties": { "$ref": "#/$defs/expressao" } },
+
+    "comando": {
+      "type": "object", "required": ["id", "tipo"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "tipo": { "enum": ["definir", "alterar", "adicionar", "se", "repetir_vezes", "enquanto", "para_cada", "parar_laco",
+                           "proximo", "esperar", "registrar", "avisar", "tentar", "concluir", "falhar", "executar_automacao",
+                           "dividir_automacao", "perguntar", "chamar_subfluxo"] },
+        "comentario": { "type": "string", "maxLength": 500 }
+      },
+      "allOf": [
+        { "if": { "properties": { "tipo": { "const": "definir" } } }, "then": { "required": ["variavel", "valor"],
+          "properties": { "variavel": { "$ref": "#/$defs/nome" }, "valor": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "alterar" } } }, "then": { "required": ["variavel", "por"],
+          "properties": { "variavel": { "$ref": "#/$defs/nome" }, "por": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "adicionar" } } }, "then": { "required": ["lista", "valor"],
+          "properties": { "lista": { "$ref": "#/$defs/nome" }, "valor": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "se" } } }, "then": { "required": ["casos"],
+          "properties": {
+            "casos": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "object", "required": ["condicao", "corpo"],
+              "additionalProperties": false,
+              "properties": { "condicao": { "$ref": "#/$defs/expressao" }, "corpo": { "$ref": "#/$defs/corpo" } } } },
+            "senao": { "$ref": "#/$defs/corpo" } } } },
+        { "if": { "properties": { "tipo": { "const": "repetir_vezes" } } }, "then": { "required": ["vezes", "corpo"],
+          "properties": { "vezes": { "$ref": "#/$defs/expressao" }, "corpo": { "$ref": "#/$defs/corpo" } } } },
+        { "if": { "properties": { "tipo": { "const": "enquanto" } } }, "then": { "required": ["condicao", "corpo"],
+          "properties": { "condicao": { "$ref": "#/$defs/expressao" }, "modo": { "enum": ["enquanto", "ate"] },
+                          "corpo": { "$ref": "#/$defs/corpo" } } } },
+        { "if": { "properties": { "tipo": { "const": "para_cada" } } }, "then": { "required": ["variavel", "lista", "corpo"],
+          "properties": { "variavel": { "$ref": "#/$defs/nome" }, "lista": { "$ref": "#/$defs/expressao" },
+                          "corpo": { "$ref": "#/$defs/corpo" } } } },
+        { "if": { "properties": { "tipo": { "const": "esperar" } } }, "then": {
+          "properties": { "segundos": { "$ref": "#/$defs/expressao" }, "ate": { "$ref": "#/$defs/expressao" } },
+          "oneOf": [{ "required": ["segundos"] }, { "required": ["ate"] }] } },
+        { "if": { "properties": { "tipo": { "const": "registrar" } } }, "then": { "required": ["texto"],
+          "properties": { "texto": { "$ref": "#/$defs/expressao" }, "nivel": { "enum": ["info", "aviso", "erro"] } } } },
+        { "if": { "properties": { "tipo": { "const": "avisar" } } }, "then": { "required": ["para", "texto"],
+          "properties": { "para": { "$ref": "#/$defs/destino" }, "texto": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "tentar" } } }, "then": { "required": ["corpo", "se_falhar"],
+          "properties": { "corpo": { "$ref": "#/$defs/corpo" }, "se_falhar": { "$ref": "#/$defs/corpo" },
+                          "motivo_em": { "$ref": "#/$defs/nome" } } } },
+        { "if": { "properties": { "tipo": { "const": "concluir" } } }, "then": {
+          "properties": { "valor": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "falhar" } } }, "then": { "required": ["motivo"],
+          "properties": { "motivo": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "executar_automacao" } } }, "then": { "required": ["automacao"],
+          "properties": {
+            "automacao": { "type": "string", "minLength": 1, "maxLength": 160, "description": "chave da automação no Catálogo" },
+            "itens": { "$ref": "#/$defs/expressao" }, "parametros": { "$ref": "#/$defs/argumentos" },
+            "guardar_em": { "$ref": "#/$defs/nome" },
+            "novas_tentativas": { "type": "object", "required": ["ate"], "additionalProperties": false,
+              "properties": { "ate": { "type": "integer", "minimum": 0, "maximum": 20 },
+                              "esperar_segundos": { "type": "integer", "minimum": 0, "maximum": 86400 } } } } } },
+        { "if": { "properties": { "tipo": { "const": "dividir_automacao" } } }, "then": { "required": ["automacao", "modo"],
+          "properties": {
+            "automacao": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "modo": { "enum": ["itens", "fatias"], "description": "itens: N partes da lista de itens; fatias: N partes do trabalho de UM item (a automação precisa aceitar)" },
+            "itens": { "$ref": "#/$defs/expressao" }, "item": { "$ref": "#/$defs/expressao" }, "fatias": { "$ref": "#/$defs/expressao" },
+            "partes": { "type": "integer", "minimum": 2, "maximum": 500 },
+            "itens_por_parte": { "type": "integer", "minimum": 1, "maximum": 100000 },
+            "parametros": { "$ref": "#/$defs/argumentos" }, "guardar_em": { "$ref": "#/$defs/nome" } },
+          "oneOf": [{ "required": ["partes"] }, { "required": ["itens_por_parte"] }] } },
+        { "if": { "properties": { "tipo": { "const": "perguntar" } } }, "then": { "required": ["para", "pergunta", "opcoes"],
+          "properties": {
+            "para": { "$ref": "#/$defs/destino" }, "pergunta": { "$ref": "#/$defs/expressao" },
+            "opcoes": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "object", "required": ["rotulo", "corpo"],
+              "additionalProperties": false,
+              "properties": { "rotulo": { "type": "string", "minLength": 1, "maxLength": 60 }, "corpo": { "$ref": "#/$defs/corpo" } } } },
+            "guardar_em": { "$ref": "#/$defs/nome" } } } },
+        { "if": { "properties": { "tipo": { "const": "chamar_subfluxo" } } }, "then": { "required": ["fluxo"],
+          "properties": { "fluxo": { "type": "string", "minLength": 1, "maxLength": 80, "description": "id do fluxo; roda a última versão publicada" },
+                          "entradas": { "$ref": "#/$defs/argumentos" }, "guardar_em": { "$ref": "#/$defs/nome" } } } }
+      ]
+    },
+
+    "expressao": {
+      "type": "object", "required": ["tipo"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "tipo": { "enum": ["numero", "texto", "booleano", "nulo", "lista", "objeto", "var", "entrada", "op", "nao", "fn",
+                           "campo", "item", "chamar"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "tipo": { "const": "numero" } } }, "then": { "required": ["valor"], "properties": { "valor": { "type": "number" } } } },
+        { "if": { "properties": { "tipo": { "const": "texto" } } }, "then": { "required": ["valor"], "properties": { "valor": { "type": "string", "maxLength": 10000 } } } },
+        { "if": { "properties": { "tipo": { "const": "booleano" } } }, "then": { "required": ["valor"], "properties": { "valor": { "type": "boolean" } } } },
+        { "if": { "properties": { "tipo": { "const": "lista" } } }, "then": { "required": ["itens"],
+          "properties": { "itens": { "type": "array", "maxItems": 1000, "items": { "$ref": "#/$defs/expressao" } } } } },
+        { "if": { "properties": { "tipo": { "const": "objeto" } } }, "then": { "required": ["campos"], "properties": { "campos": { "$ref": "#/$defs/argumentos" } } } },
+        { "if": { "properties": { "tipo": { "enum": ["var", "entrada"] } } }, "then": { "required": ["nome"], "properties": { "nome": { "$ref": "#/$defs/nome" } } } },
+        { "if": { "properties": { "tipo": { "const": "op" } } }, "then": { "required": ["op", "a", "b"],
+          "properties": { "op": { "enum": ["+", "-", "*", "/", "%", "=", "!=", "<", "<=", ">", ">=", "e", "ou"] },
+                          "a": { "$ref": "#/$defs/expressao" }, "b": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "nao" } } }, "then": { "required": ["a"], "properties": { "a": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "fn" } } }, "then": { "required": ["nome", "args"],
+          "properties": { "nome": { "enum": ["tamanho", "vazio", "contem", "juntar_texto", "substituir", "dividir_texto", "maiusculas",
+                                             "minusculas", "arredondar", "minimo", "maximo", "soma", "absoluto", "hoje", "agora",
+                                             "somar_dias", "competencia", "formatar_data", "primeiro", "ultimo", "dividir_em_partes",
+                                             "sem_repetidos", "para_texto", "para_numero"] },
+                          "args": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/expressao" } } } } },
+        { "if": { "properties": { "tipo": { "const": "campo" } } }, "then": { "required": ["de", "campo"],
+          "properties": { "de": { "$ref": "#/$defs/expressao" }, "campo": { "type": "string", "minLength": 1, "maxLength": 60 } } } },
+        { "if": { "properties": { "tipo": { "const": "item" } } }, "then": { "required": ["de", "indice"],
+          "properties": { "de": { "$ref": "#/$defs/expressao" }, "indice": { "$ref": "#/$defs/expressao" } } } },
+        { "if": { "properties": { "tipo": { "const": "chamar" } } }, "then": { "required": ["funcao", "args"],
+          "properties": { "funcao": { "$ref": "#/$defs/nome" }, "args": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/expressao" } } } } }
+      ]
+    }
+  }
+}

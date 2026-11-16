@@ -47,7 +47,7 @@ do ecossistema; o Automation Agent e o Execution Plane.
 
 ## Ownership
 
-Consulte `docs/domain-model.md` e `docs/modules.md`. Apenas o contexto
+Consulte `docs/visao-geral.md` (Modulos do backend). Apenas o contexto
 proprietario altera diretamente sua entidade. Outros contextos usam casos de
 uso, comandos internos ou contratos.
 
@@ -78,11 +78,22 @@ automacao. O Agent nao inicia execucao antes de `execution.commit`.
 ## Compatibilidade
 
 O codigo atual ainda usa `Worker`, `Job` e `Execution` legado. Trate esses
-nomes como adaptadores temporarios conforme `docs/migration.md`, desde que
-chamem a nova camada de aplicacao e nao dupliquem regra de dominio.
+nomes como adaptadores temporarios, desde que chamem a nova camada de
+aplicacao e nao dupliquem regra de dominio.
 
 ## Frontend
 
-Consulte `docs/frontend-integration.md` antes de alterar qualquer chamada de
-API do frontend. O redesenho segue o ADR-020 e o plano de fases em
-`docs/fase-0-diagnostico-orquestracao.md`.
+Cada aba do menu tem o seu documento em `docs/telas/<aba>.md`, com o que a
+tela faz, quem pode e as rotas da API que usa (secao "Por dentro"). Consulte-o
+antes de alterar uma chamada de API do frontend. A camada visual segue o
+ADR-020 e `docs/design-system.md`.
+
+## Documentacao
+
+- `docs/README.md` e o indice; `docs/visao-geral.md` explica arquitetura,
+  modulos, como rodar e testar; `docs/decisoes.md` guarda as decisoes (ADRs).
+- Mudou o comportamento de uma tela: atualize o `docs/telas/<aba>.md` no mesmo
+  trabalho. Aba nova no menu precisa de documento (o teste de arquitetura cobra).
+- Nao crie relatorios de fase, diagnosticos ou pastas de capturas em `docs/`.
+  Capturas dos testes de tela ficam em `frontend/test-results/` (fora do Git).
+- Decisao nova de arquitetura: uma linha nova em `docs/decisoes.md`.

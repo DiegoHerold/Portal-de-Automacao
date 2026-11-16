@@ -89,7 +89,9 @@ class EnfileirarExecucao:
 
     def execute(self, *, automation_version_id: int, itens: list[dict[str, Any]], parametros: dict[str, Any],
                 prioridade: int, solicitante: str | None, now: datetime, continua_de: str | None = None,
-                origem: str = "manual") -> dict[str, Any]:
+                origem: str = "manual", agrupamento: list[list[str]] | None = None) -> dict[str, Any]:
+        """``agrupamento`` (fluxos, "Dividir automação" por itens): as chaves de cada job, no lugar do
+        agrupamento padrão (um job por grupo). Cada item entra em exatamente um job."""
         versao = self.versions.get_published_snapshot(automation_version_id)
         if versao is None:
             raise FilaError("A versão não está publicada com pacote e runtime: não pode entrar na fila.")
@@ -100,7 +102,14 @@ class EnfileirarExecucao:
         atributos = tuple(manifesto_itens.get("work_attributes") or ()) if isinstance(manifesto_itens, dict) else None
 
         execution_id = f"exe_{uuid4().hex}"
-        grupos = agrupar(itens) if itens else [[]]
+        if agrupamento is not None:
+            por_chave = {str(i["chave"]): i for i in itens}
+            usadas = [c for parte in agrupamento for c in parte]
+            if sorted(usadas) != sorted(por_chave) or any(not parte for parte in agrupamento):
+                raise FilaError("A divisão precisa usar cada item exatamente uma vez, sem parte vazia.")
+            grupos = [[por_chave[c] for c in parte] for parte in agrupamento]
+        else:
+            grupos = agrupar(itens) if itens else [[]]
         pedidos: list[JobPedido] = []
         execucao_criada = False
         for grupo in grupos:

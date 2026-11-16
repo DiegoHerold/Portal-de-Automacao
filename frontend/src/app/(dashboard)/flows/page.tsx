@@ -1,15 +1,6 @@
-import { FlowsManager } from "@/components/flows/flows-manager";
-import { PageTitle } from "@/components/shared/page-title";
+import { ListaDeFluxos } from "@/components/fluxos/lista-de-fluxos";
 
+/** Fluxos em passos (ADR-021): a lista. O editor fica em /flows/[id]. */
 export default function FlowsPage() {
-  return (
-    <div className="space-y-6">
-      <PageTitle
-        eyebrow="Operação"
-        title="Fluxos"
-        description="Orquestre automações com dependências, condições e acompanhamento visual em tempo real."
-      />
-      <FlowsManager />
-    </div>
-  );
+  return <ListaDeFluxos />;
 }

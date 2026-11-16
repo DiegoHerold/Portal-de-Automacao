@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * semana futura (a ocorrência que já passou não se arrasta).
  */
 
-const TELAS = "../docs/agenda-telas";
+const TELAS = "test-results/telas/agenda";
 mkdirSync(TELAS, { recursive: true });
 
 const pad = (n: number) => String(n).padStart(2, "0");

@@ -15,7 +15,7 @@ a single source of truth for the Portal API contract.
 
 Every value that could plausibly be a secret (bearer tokens, registration
 tokens) is deliberately kept out of stdout in the JSON responses printed by
-this CLI — see docs/certification-harness.md item 78.
+this CLI — see automation-agent/docs/certification-harness.md item 78.
 """
 
 from __future__ import annotations

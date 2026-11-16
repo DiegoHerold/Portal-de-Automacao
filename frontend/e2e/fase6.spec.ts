@@ -7,7 +7,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * administrativas no visual novo. A API é simulada só aqui.
  */
 
-const TELAS = "../docs/fase-6-telas";
+const TELAS = "test-results/telas/fase-6";
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };
 

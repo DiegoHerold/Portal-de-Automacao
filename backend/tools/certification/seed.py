@@ -10,10 +10,10 @@ Ensures, through the real Portal API only (no direct DB writes):
     equivalent (this Portal build does not have a separate "channel" concept
     on AutomationVersion beyond draft/published/deprecated/blocked — publishing
     an AutomationVersion is the closest real equivalent, see
-    docs/certification-harness.md "Seed do Portal")
+    automation-agent/docs/certification-harness.md "Seed do Portal")
 
 Running this twice must not create duplicate automations, versions, or
-runtimes (docs/certification-harness.md item 38, "Idempotência do seed"):
+runtimes (automation-agent/docs/certification-harness.md item 38, "Idempotência do seed"):
 categories/automations/runtimes are looked up by key/slug before creating,
 and an AutomationVersion already in `published` status is left untouched
 rather than re-uploaded.
@@ -90,7 +90,7 @@ def seed_certification(
     category = client.get_or_create_category(
         CERTIFICATION_CATEGORY_NAME,
         CERTIFICATION_CATEGORY_SLUG,
-        "Portal-Agent certification harness packages (docs/certification-harness.md).",
+        "Portal-Agent certification harness packages (automation-agent/docs/certification-harness.md).",
     )
     _ensure_runtime_published(client)
 

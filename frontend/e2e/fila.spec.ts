@@ -8,7 +8,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * job perdido) aparece uma vez para os prints da Fase 3.
  */
 
-const TELAS = "../docs/fase-3-telas";
+const TELAS = "test-results/telas/fase-3";
 
 function emMinutos(agora: number, min: number): string {
   return new Date(agora + min * 60_000).toISOString();

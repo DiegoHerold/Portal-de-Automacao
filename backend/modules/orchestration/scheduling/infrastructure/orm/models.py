@@ -20,8 +20,9 @@ class Schedule(Base):
     name: Mapped[str | None] = mapped_column(String(180))
     automation_id: Mapped[int | None] = mapped_column(ForeignKey("automations.id"), nullable=True, index=True)
     automation_version_id: Mapped[int | None] = mapped_column(ForeignKey("automation_versions.id"), nullable=True, index=True)
-    flow_id: Mapped[str | None] = mapped_column(ForeignKey("flows.id"), nullable=True, index=True)
-    flow_version_id: Mapped[str | None] = mapped_column(ForeignKey("flow_versions.id"), nullable=True, index=True)
+    # Fluxos refeitos (Fase 1): sem chave estrangeira até a Fase 8 ligar aos fluxos novos.
+    flow_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    flow_version_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     target_type: Mapped[str] = mapped_column(String(40), nullable=False, default="automation", index=True)
 
     cron_expression: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -60,7 +61,7 @@ class ScheduleExecutionRecord(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     trigger_type: Mapped[str] = mapped_column(String(40), nullable=False, default="scheduled")
     execution_id: Mapped[str | None] = mapped_column(ForeignKey("orchestration_executions.id", ondelete="SET NULL"), nullable=True, index=True)
-    flow_execution_id: Mapped[str | None] = mapped_column(ForeignKey("flow_executions.id", ondelete="SET NULL"), nullable=True, index=True)
+    flow_execution_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     result: Mapped[dict | None] = mapped_column(JSONB)

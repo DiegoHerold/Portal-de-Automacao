@@ -11,13 +11,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/hooks/use-auth";
-import { pickHeadlineVersion } from "@/lib/flow-api";
 import { createSchedule, updateSchedule } from "@/lib/schedule-api";
 import { MISFIRE_POLICY_OPTIONS, OVERLAP_POLICY_OPTIONS } from "@/lib/schedule-policies";
-import { flowVersionStatusMeta } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import type { Automation } from "@/types/automation";
-import type { Flow, FlowVersion } from "@/types/flow";
+import type { FluxoAgendavel as Flow } from "@/types/schedule";
 import type { MisfirePolicy, OverlapPolicy, RecurrenceType, Schedule, SchedulePreviewPayload, ScheduleWritePayload, TargetType } from "@/types/schedule";
 
 const RECURRENCE_TYPES: { value: RecurrenceType; label: string }[] = [
@@ -177,17 +175,6 @@ export function ScheduleFormSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingId, editing?.id]);
 
-  const flowVersions = useApi<FlowVersion[]>(form.flow_id ? `/flows/${form.flow_id}/versions` : null, {
-    enabled: open && form.target_type === "flow" && !!form.flow_id,
-  });
-
-  useEffect(() => {
-    if (form.target_type !== "flow" || !flowVersions.data || form.flow_version_id) return;
-    const headline = pickHeadlineVersion(flowVersions.data);
-    if (headline) setForm((f) => ({ ...f, flow_version_id: headline.id }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flowVersions.data]);
-
   function toggleWeekday(day: number) {
     setForm((f) => ({ ...f, weekdays: f.weekdays.includes(day) ? f.weekdays.filter((d) => d !== day) : [...f.weekdays, day].sort() }));
   }
@@ -268,7 +255,7 @@ export function ScheduleFormSheet({
         <section className="space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">O que agendar</h3>
           <div className="grid grid-cols-2 gap-2">
-            {(["automation", "flow"] as TargetType[]).map((t) => (
+            {(["automation"] as TargetType[]).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -295,37 +282,7 @@ export function ScheduleFormSheet({
                 ))}
               </Select>
             </Field>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field>
-                <Label htmlFor="s-flow">Fluxo</Label>
-                <Select id="s-flow" value={form.flow_id} onChange={(e) => setForm({ ...form, flow_id: e.target.value, flow_version_id: "" })}>
-                  <option value="">Selecione...</option>
-                  {flows.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field>
-                <Label htmlFor="s-flow-version">Versão</Label>
-                <Select
-                  id="s-flow-version"
-                  value={form.flow_version_id}
-                  disabled={!form.flow_id}
-                  onChange={(e) => setForm({ ...form, flow_version_id: e.target.value })}
-                >
-                  <option value="">{flowVersions.loading ? "Carregando..." : "Selecione..."}</option>
-                  {flowVersions.data?.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.version} ({flowVersionStatusMeta(v.status).label})
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-          )}
+          ) : null}
         </section>
 
         <section className="space-y-3">

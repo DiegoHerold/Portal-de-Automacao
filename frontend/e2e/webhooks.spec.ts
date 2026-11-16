@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * automação, exemplo) e mostra as chamadas; o token aparece uma vez; o migrado pede token novo.
  */
 
-const TELAS = "../docs/webhooks-telas";
+const TELAS = "test-results/telas/webhooks";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };

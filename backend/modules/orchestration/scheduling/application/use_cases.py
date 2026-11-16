@@ -10,7 +10,6 @@ from croniter import croniter
 from modules.governance.domain.audit import AuditEvent
 from modules.orchestration.application.dto import ActorDTO
 from modules.orchestration.application.ports import ExecutionRepository
-from modules.orchestration.flows.application.ports import FlowExecutionRepository
 from modules.orchestration.scheduling.application.dto import ScheduleDTO, ScheduleExecutionDTO
 from modules.orchestration.scheduling.application.ports import ScheduleExecutionCreator, ScheduleExecutionRepository, ScheduleRepository, OutboxPort, TransactionManager
 from modules.orchestration.scheduling.domain import DEFAULT_TIMEZONE, RecurrenceInput, aware, build_cron_expression, calculate_next_run, timezone_or_default
@@ -197,13 +196,11 @@ class ReconcileScheduleExecutions:
         self,
         schedule_executions: ScheduleExecutionRepository,
         executions: ExecutionRepository,
-        flow_executions: FlowExecutionRepository,
         outbox: OutboxPort,
         transaction: TransactionManager,
     ) -> None:
         self.schedule_executions = schedule_executions
         self.executions = executions
-        self.flow_executions = flow_executions
         self.outbox = outbox
         self.transaction = transaction
 
@@ -233,10 +230,6 @@ class ReconcileScheduleExecutions:
         return {"reconciled": reconciled}
 
     def _current_state(self, item: ScheduleExecutionDTO) -> tuple[str, datetime | None, dict[str, Any] | None, str | None]:
-        if item.flow_execution_id:
-            flow_execution = self.flow_executions.get(item.flow_execution_id)
-            if flow_execution is not None:
-                return flow_execution.status, flow_execution.completed_at, flow_execution.output, flow_execution.failure_summary
         if item.execution_id:
             execution = self.executions.get(item.execution_id)
             if execution is not None:
@@ -348,16 +341,16 @@ def _schedule_from_payload(payload: dict[str, Any], *, actor: ActorDTO, existing
         cron_expression = build_cron_expression(RecurrenceInput(recurrence_type=recurrence_type, time_of_day=time_of_day, weekdays=weekdays, day_of_month=day_of_month, specific_date=specific_date))
     timezone = str(payload.get("timezone") or (existing.timezone if existing else DEFAULT_TIMEZONE))
     target_type = str(payload.get("target_type") or ("flow" if payload.get("flow_version_id") else (existing.target_type if existing else "automation")))
-    if target_type not in {"automation", "flow"}:
-        raise ValueError("target_type must be 'automation' or 'flow'.")
+    if target_type == "flow":
+        raise ValueError("Agendar fluxo ainda não está disponível.")
+    if target_type != "automation":
+        raise ValueError("target_type must be 'automation'.")
     automation_id = payload.get("automation_id", existing.automation_id if existing else None)
     automation_version_id = payload.get("automation_version_id", existing.automation_version_id if existing else None)
     flow_id = payload.get("flow_id", existing.flow_id if existing else None)
     flow_version_id = payload.get("flow_version_id", existing.flow_version_id if existing else None)
     if target_type == "automation" and automation_id is None and automation_version_id is None:
         raise ValueError("Automation schedule requires automation_id or automation_version_id.")
-    if target_type == "flow" and flow_version_id is None:
-        raise ValueError("Flow schedule requires flow_version_id.")
     next_base = existing.last_run_at or now if existing else now
     draft = ScheduleDTO(
         id=existing.id if existing else None,

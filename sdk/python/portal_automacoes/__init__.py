@@ -5,7 +5,8 @@ from .automacao import VERSAO_SDK, Automacao, Etapa, ParadaSolicitada
 from .emails import EmailIndisponivel, EmailRecusado
 from .eventos import EventoInvalido
 from .imagens import ImagemRecusada
+from .partes import Parte, parte_do_trabalho
 from .segredos import Segredo, SegredoIndisponivel
 from .trabalhador import job_atual
 
-__all__ = ["VERSAO_SDK", "Automacao", "EmailIndisponivel", "EmailRecusado", "Etapa", "EventoInvalido", "ImagemRecusada", "ParadaSolicitada", "Segredo", "SegredoIndisponivel", "job_atual"]
+__all__ = ["VERSAO_SDK", "Automacao", "EmailIndisponivel", "EmailRecusado", "Etapa", "EventoInvalido", "ImagemRecusada", "ParadaSolicitada", "Parte", "Segredo", "SegredoIndisponivel", "job_atual", "parte_do_trabalho"]

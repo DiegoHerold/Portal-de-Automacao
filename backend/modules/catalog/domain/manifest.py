@@ -113,6 +113,8 @@ class ExecutionSpec:
     safe_to_retry: bool = False
     # Estado guardado fora da máquina: "continuar de onde parou" pode ir para outra máquina.
     central_state: bool = False
+    # Aceita rodar com o trabalho de um item repartido (fluxos: "Dividir automação" por partes).
+    split_work: bool = False
 
 
 @dataclass(frozen=True)
@@ -260,6 +262,7 @@ def parse_automation_manifest(raw_yaml: str) -> tuple[AutomationManifest | None,
             "graceful_cancellation_seconds": execution.graceful_cancellation_seconds,
             "safe_to_retry": execution.safe_to_retry,
             "central_state": execution.central_state,
+            "split_work": execution.split_work,
         },
         "items": None if items is None else {
             "label": items.label,
@@ -559,7 +562,8 @@ def _parse_execution(raw_execution: Any, result: ValidationResult) -> ExecutionS
         mode = EXECUTION_MODE_ALIASES[mode]
     safe_to_retry = execution.get("seguro_repetir", execution.get("safe_to_retry", False))
     central_state = execution.get("estado_central", execution.get("central_state", False))
-    for name, value in (("seguro_repetir", safe_to_retry), ("estado_central", central_state)):
+    split_work = execution.get("aceita_partes", execution.get("split_work", False))
+    for name, value in (("seguro_repetir", safe_to_retry), ("estado_central", central_state), ("aceita_partes", split_work)):
         if not isinstance(value, bool):
             result.add("MANIFEST_EXECUTION_FLAG_INVALID", f"execution.{name}", f"{name} deve ser true ou false.")
     timeout_seconds = execution.get("timeout_seconds", 300)
@@ -580,6 +584,7 @@ def _parse_execution(raw_execution: Any, result: ValidationResult) -> ExecutionS
         graceful_cancellation_seconds=graceful,
         safe_to_retry=safe_to_retry is True,
         central_state=central_state is True,
+        split_work=split_work is True,
     )
 
 

@@ -54,6 +54,7 @@ from modules.governance.api.retencao import router as retencao_router
 from modules.governance.api.auditoria import router as auditoria_router
 from modules.telemetry.correio.api import router as emails_router
 from modules.orchestration.pendencias.api import router as pendencias_router
+from modules.orchestration.fluxos.api import router as fluxos_router
 from modules.governance.api.segredos import router as segredos_router
 from modules.governance.api import registro_de_requisicoes
 from modules.telemetry.api.realtime import router as realtime_router
@@ -182,6 +183,7 @@ def register_governance_routes(router: APIRouter) -> None:
     router.include_router(auditoria_router)
     router.include_router(emails_router)
     router.include_router(pendencias_router)
+    router.include_router(fluxos_router)
     router.include_router(segredos_router)
 
 

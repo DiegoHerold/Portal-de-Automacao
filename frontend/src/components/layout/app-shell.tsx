@@ -14,8 +14,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { ALL_NAV_ITEMS } from "@/lib/navigation";
 import { itemVisivel } from "@/lib/permissions";
 
+/** Telas de trabalho em quadro (editor de fluxo e execução ao vivo): ocupam a área toda, sem margem nem "Voltar". */
+export function ehAreaDeTrabalho(caminho: string): boolean {
+  return /^\/flows\/(execucoes\/)?[^/]+$/.test(caminho) && caminho !== "/flows/execucoes";
+}
+
 export function AppShell({ children }: PropsWithChildren) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const area = ehAreaDeTrabalho(usePathname() ?? "/");
 
   return (
     <RealtimeStatusProvider>
@@ -24,10 +30,16 @@ export function AppShell({ children }: PropsWithChildren) {
         <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader onOpenSidebar={() => setMobileOpen(true)} />
-          <main className="mx-auto w-full max-w-[110rem] flex-1 space-y-8 px-5 py-7 sm:px-8 lg:px-12 lg:py-10">
-            <BotaoVoltar />
-            <GuardaDaAba>{children}</GuardaDaAba>
-          </main>
+          {area ? (
+            <main className="flex min-h-0 w-full flex-1 flex-col">
+              <GuardaDaAba>{children}</GuardaDaAba>
+            </main>
+          ) : (
+            <main className="mx-auto w-full max-w-[110rem] flex-1 space-y-8 px-5 py-7 sm:px-8 lg:px-12 lg:py-10">
+              <BotaoVoltar />
+              <GuardaDaAba>{children}</GuardaDaAba>
+            </main>
+          )}
         </div>
       </div>
     </RealtimeStatusProvider>

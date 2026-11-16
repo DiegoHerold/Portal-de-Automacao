@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import type { Automation } from "@/types/automation";
-import type { Flow } from "@/types/flow";
+import type { FluxoAgendavel as Flow } from "@/types/schedule";
 import type { Schedule, ScheduleCalendarItem, ScheduleCalendarResponse } from "@/types/schedule";
 
 type Visao = "dia" | "semana" | "mes";
@@ -59,7 +59,8 @@ export function AgendaCalendario() {
     `/schedules/calendar?from=${de}&to=${ate}&timezone=${encodeURIComponent(FUSO_PADRAO)}&view=${visao === "mes" ? "month" : visao === "dia" ? "day" : "week"}&target_type=all`,
     { pollMs: 60000 });
   const automacoes = useApi<Automation[]>("/automations");
-  const fluxos = useApi<Flow[]>("/flows");
+  // Fluxos em blocos voltam a ser agendáveis na Fase 8 (ADR-021): até lá, nenhum.
+  const fluxos = { data: [] as Flow[] };
 
   const [aberto, setAberto] = useState<{ item: ScheduleCalendarItem; x: number; y: number } | null>(null);
   const [form, setForm] = useState<{ editando: number | null; prefill?: PrefillDoAgendamento } | null>(null);

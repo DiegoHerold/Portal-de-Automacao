@@ -29,7 +29,7 @@ PORTAL_CONTEXTS: tuple[PortalContext, ...] = (
     PortalContext(
         name="orchestration",
         responsibilities=("executions", "tasks", "attempts", "flows", "schedules", "results"),
-        owns=("Execution", "TaskExecution", "ExecutionAttempt", "Flow", "FlowVersion", "FlowExecution", "Schedule", "ScheduleExecution"),
+        owns=("Execution", "TaskExecution", "ExecutionAttempt", "Schedule", "ScheduleExecution", "Fluxo", "FluxoVersao"),
     ),
     PortalContext(
         name="dispatch",

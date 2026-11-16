@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * perdidos) e, por último, as últimas automações. API simulada só aqui.
  */
 
-const TELAS = "../docs/painel-andamento-telas";
+const TELAS = "test-results/telas/painel-andamento";
 mkdirSync(TELAS, { recursive: true });
 
 function execucao(em: (s: number) => string, id: string, automacao: string, maquina: string, extra: Record<string, unknown> = {}) {

@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from modules.governance.infrastructure.orm.models import SecretGrantRecord, SecretRecord, SecretVersionRecord
@@ -131,8 +131,15 @@ class SqlAlchemySegredos:
         return versao
 
     def mudar(self, segredo: SecretRecord, dados: dict[str, Any], agora: datetime) -> None:
-        for campo in ("name", "description", "status", "campos"):
+        for campo in ("key", "name", "description", "status", "campos"):
             if campo in dados:
                 setattr(segredo, campo, dados[campo])
         segredo.updated_at = agora
+        self.db.flush()
+
+    def apagar(self, segredo: SecretRecord) -> None:
+        """Versões e ligações saem junto (chave estrangeira em cascata)."""
+        segredo_id = segredo.id
+        self.db.expunge(segredo)
+        self.db.execute(delete(SecretRecord).where(SecretRecord.id == segredo_id).execution_options(synchronize_session=False))
         self.db.flush()

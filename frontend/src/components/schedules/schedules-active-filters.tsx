@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 
 import { DEFAULT_TIMEZONE, STATUS_FILTER_OPTIONS, type ScheduleFilters } from "@/lib/schedule-filters";
 import type { Automation } from "@/types/automation";
-import type { Flow } from "@/types/flow";
+import type { FluxoAgendavel as Flow } from "@/types/schedule";
 
 function Chip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
   return (

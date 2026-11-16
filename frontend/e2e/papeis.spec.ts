@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * funcionalidade fora do papel não abre pelo link. Sessão vencida leva ao login e volta.
  */
 
-const TELAS = "../docs/papeis-telas";
+const TELAS = "test-results/telas/papeis";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };

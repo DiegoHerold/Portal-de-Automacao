@@ -7,6 +7,7 @@ import { CheckCircle2, CircleAlert, Hand, Play } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageTitle } from "@/components/shared/page-title";
+import { DecisoesDeFluxo } from "@/components/pendencias/decisoes-de-fluxo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -150,8 +151,9 @@ export function PaginaDePendencias() {
       <PageTitle eyebrow="Monitorar" title="Pendências"
         description="Itens que pararam esperando uma pessoa. Depois de resolver, continue o processo: só esses itens entram na fila." />
       {feito && <Continuado feito={feito} />}
+      <DecisoesDeFluxo />
       {dados.error ? <ErrorState message={dados.error} onRetry={dados.refetch} /> : !dados.data ? <div className="skeleton h-48 rounded-xl" /> :
-        grupos.length === 0 ? <EmptyState icon={CheckCircle2} title="Nada aguardando" description="Quando um item parar esperando uma pessoa, ele aparece aqui." /> : (
+        grupos.length === 0 ? <EmptyState icon={CheckCircle2} title="Nenhum item aguardando" description="Quando um item parar esperando uma pessoa, ele aparece aqui." /> : (
           <div className="space-y-4" data-testid="lista-de-pendencias">
             {grupos.map((g) => (
               <section key={g.execucao_id} className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm" data-execucao={g.execucao_id}>

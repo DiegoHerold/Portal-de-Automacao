@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, KeyRound, Pencil, Plus, Search, X } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -34,7 +34,8 @@ export type Segredo = {
 };
 type Versao = { versao: number; criada_em: string | null; criada_por: string | null; expira_em: string | null; atual: boolean };
 type Automacao = { id: number; name: string; status?: string };
-type Linha = { nome: string; oculto: boolean; valor: string; existente: boolean };
+/** `original`: nome do campo já salvo. Renomeado, deixa de ser existente e pede o valor de novo. */
+type Linha = { nome: string; oculto: boolean; valor: string; existente: boolean; original?: string };
 
 const MODELOS: { rotulo: string; campos: Omit<Linha, "existente">[] }[] = [
   { rotulo: "Senha", campos: [{ nome: "senha", oculto: true, valor: "" }] },
@@ -137,10 +138,10 @@ function EditorDeCampos({ linhas, onMudar }: { linhas: Linha[]; onMudar: (linhas
       </div>
       {linhas.map((l, i) => (
         <div key={i} className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto_auto] items-center gap-2" data-campo={l.nome || `novo-${i}`}>
-          <Input aria-label={`Nome do campo ${i + 1}`} className="font-mono" value={l.nome} placeholder="senha" disabled={l.existente}
-            onChange={(e) => mudar(i, { nome: nomeDeCampo(e.target.value) })} />
+          <Input aria-label={`Nome do campo ${i + 1}`} className="font-mono" value={l.nome} placeholder="senha"
+            onChange={(e) => { const nome = nomeDeCampo(e.target.value); mudar(i, { nome, existente: !!l.original && nome === l.original }); }} />
           <Input aria-label={`Valor de ${l.nome || `campo ${i + 1}`}`} type={l.oculto ? "password" : "text"} autoComplete="new-password"
-            value={l.valor} placeholder={l.existente ? (l.oculto ? "manter o atual" : "") : ""} onChange={(e) => mudar(i, { valor: e.target.value })} />
+            value={l.valor} placeholder={l.existente ? (l.oculto ? "manter o atual" : "") : l.original ? "valor de novo (campo renomeado)" : ""} onChange={(e) => mudar(i, { valor: e.target.value })} />
           <button type="button" aria-label={l.oculto ? `${l.nome || "campo"} oculto` : `${l.nome || "campo"} visível`}
             title={l.oculto ? "Oculto: nunca aparece e vira *** no log" : "Visível: aparece no Portal"}
             className={`flex h-9 w-9 items-center justify-center rounded-md border ${l.oculto ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
@@ -244,6 +245,8 @@ function DetalhesDoSegredo({ segredo, gerencia, onFechar, onMudou }: { segredo: 
   const automacoes = useApi<Automacao[]>(segredo && gerencia ? "/automations" : null, { enabled: !!segredo && gerencia });
   const [escolhidas, setEscolhidas] = useState<number[] | null>(null);
   const [editando, setEditando] = useState(false);
+  const [editandoDados, setEditandoDados] = useState(false);
+  const [apagando, setApagando] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
   const ligadas = segredo?.automacoes.map((a) => a.id) ?? [];
@@ -282,11 +285,14 @@ function DetalhesDoSegredo({ segredo, gerencia, onFechar, onMudou }: { segredo: 
               </span>
             </div>
             {gerencia && (
-              <Button size="sm" variant="outline" disabled={ocupado}
-                onClick={() => void enviar(`/segredos/${segredo.id}`, "PUT", { situacao: segredo.situacao === "active" ? "disabled" : "active" },
-                  segredo.situacao === "active" ? "Segredo desativado: nenhuma automação recebe mais" : "Segredo reativado")}>
-                {segredo.situacao === "active" ? "Desativar" : "Reativar"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => setEditandoDados(true)}><Pencil className="h-4 w-4" /> Editar nome e chave</Button>
+                <Button size="sm" variant="outline" disabled={ocupado}
+                  onClick={() => void enviar(`/segredos/${segredo.id}`, "PUT", { situacao: segredo.situacao === "active" ? "disabled" : "active" },
+                    segredo.situacao === "active" ? "Segredo desativado: nenhuma automação recebe mais" : "Segredo reativado")}>
+                  {segredo.situacao === "active" ? "Desativar" : "Reativar"}
+                </Button>
+              </div>
             )}
           </section>
           {segredo.descricao && <p className="text-sm text-muted-foreground">{segredo.descricao}</p>}
@@ -367,10 +373,24 @@ function DetalhesDoSegredo({ segredo, gerencia, onFechar, onMudou }: { segredo: 
               ))}
             </ul>
           </section>
+
+          {gerencia && (
+            <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+              <div>
+                <h3 className="font-semibold text-titulo">Apagar segredo</h3>
+                <p className="text-sm text-muted-foreground">Apaga os valores, as versões e as ligações. Para só pausar, use Desativar.</p>
+              </div>
+              <Button size="sm" variant="destructive" onClick={() => setApagando(true)}><Trash2 className="h-4 w-4" /> Apagar</Button>
+            </section>
+          )}
         </div>
       )}
       <EditarCampos segredo={editando ? segredo : null} onFechar={() => setEditando(false)}
         onSalvo={async () => { setEditando(false); await Promise.all([onMudou(), versoes.refetch()]); }} />
+      <EditarDados segredo={editandoDados ? segredo : null} onFechar={() => setEditandoDados(false)}
+        onSalvo={async () => { setEditandoDados(false); await onMudou(); }} />
+      <ApagarSegredo segredo={apagando ? segredo : null} onFechar={() => setApagando(false)}
+        onApagado={async () => { setApagando(false); fechar(); await onMudou(); }} />
     </Sheet>
   );
 }
@@ -382,7 +402,7 @@ function EditarCampos({ segredo, onFechar, onSalvo }: { segredo: Segredo | null;
   const [expira, setExpira] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const atuais = linhas ?? (segredo?.campos ?? []).map((c) => ({ nome: c.nome, oculto: c.oculto, valor: c.oculto ? "" : c.valor ?? "", existente: true }));
+  const atuais = linhas ?? (segredo?.campos ?? []).map((c) => ({ nome: c.nome, oculto: c.oculto, valor: c.oculto ? "" : c.valor ?? "", existente: true, original: c.nome }));
 
   function fechar() { setLinhas(null); setExpira(null); setErro(null); onFechar(); }
 
@@ -410,13 +430,111 @@ function EditarCampos({ segredo, onFechar, onSalvo }: { segredo: Segredo | null;
       footer={<><Button variant="ghost" onClick={fechar}>Cancelar</Button><Button onClick={() => void salvar()} disabled={salvando}>{salvando ? "Salvando..." : "Salvar campos"}</Button></>}>
       <div className="space-y-4">
         <p className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
-          Campo oculto em branco mantém o valor atual. Valor trocado vale a partir do próximo pedido; execuções que já pegaram seguem com o antigo.
+          Campo oculto em branco mantém o valor atual. Renomear um campo pede o valor de novo. Valor trocado vale a partir do próximo
+          pedido; execuções que já pegaram seguem com o antigo.
         </p>
         {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
         <EditorDeCampos linhas={atuais} onMudar={setLinhas} />
         <Field><Label htmlFor="campos-expira">Vence em <span className="font-normal text-muted-foreground">(opcional)</span></Label>
           <Input id="campos-expira" type="datetime-local" value={expira ?? ""} onChange={(e) => setExpira(e.target.value)} /></Field>
       </div>
+    </Modal>
+  );
+}
+
+function EditarDados({ segredo, onFechar, onSalvo }: { segredo: Segredo | null; onFechar: () => void; onSalvo: () => Promise<void> }) {
+  const { token } = useAuth();
+  const { toast } = useToast();
+  const [f, setF] = useState<{ nome: string; chave: string; descricao: string } | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const atual = f ?? { nome: segredo?.nome ?? "", chave: segredo?.chave ?? "", descricao: segredo?.descricao ?? "" };
+  const chaveMudou = !!segredo && chaveDe(atual.chave) !== segredo.chave;
+
+  function fechar() { setF(null); setErro(null); onFechar(); }
+
+  async function salvar() {
+    if (!segredo) return;
+    if (!atual.nome.trim() || !atual.chave.trim()) return setErro("Preencha nome e chave.");
+    setSalvando(true); setErro(null);
+    try {
+      await apiRequest(`/segredos/${segredo.id}`, { token, method: "PUT", body: JSON.stringify({
+        nome: atual.nome.trim(), chave: atual.chave.trim(), descricao: atual.descricao.trim() || null }) });
+      toast({ title: "Segredo atualizado", kind: "success" });
+      setF(null);
+      await onSalvo();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Modal open={!!segredo} onClose={fechar} title="Editar nome e chave" description={segredo?.nome}
+      footer={<><Button variant="ghost" onClick={fechar}>Cancelar</Button><Button onClick={() => void salvar()} disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button></>}>
+      <div className="space-y-4">
+        {erro && <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{erro}</p>}
+        <Field><Label htmlFor="editar-nome">Nome</Label>
+          <Input id="editar-nome" value={atual.nome} onChange={(e) => setF({ ...atual, nome: e.target.value })} /></Field>
+        <Field><Label htmlFor="editar-chave">Chave</Label>
+          <Input id="editar-chave" className="font-mono" value={atual.chave} autoComplete="off" onChange={(e) => setF({ ...atual, chave: e.target.value })} /></Field>
+        {chaveMudou && segredo && (
+          <p role="alert" className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
+            O código das automações chama o segredo pela chave. Depois de salvar, troque <span className="font-mono">a.segredo("{segredo.chave}")</span> por{" "}
+            <span className="font-mono">a.segredo("{chaveDe(atual.chave)}")</span>
+            {segredo.automacoes.length > 0 && <> em: {segredo.automacoes.map((a) => a.nome).join(", ")}</>}. Até lá, elas não recebem este segredo.
+          </p>
+        )}
+        <Field><Label htmlFor="editar-descricao">Para que serve <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+          <Textarea id="editar-descricao" rows={2} value={atual.descricao} onChange={(e) => setF({ ...atual, descricao: e.target.value })} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+function ApagarSegredo({ segredo, onFechar, onApagado }: { segredo: Segredo | null; onFechar: () => void; onApagado: () => Promise<void> }) {
+  const { token } = useAuth();
+  const { toast } = useToast();
+  const [confirmacao, setConfirmacao] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [apagando, setApagando] = useState(false);
+  const confere = !!segredo && confirmacao.trim() === segredo.chave;
+
+  function fechar() { setConfirmacao(""); setErro(null); onFechar(); }
+
+  async function apagar() {
+    if (!segredo || !confere) return;
+    setApagando(true); setErro(null);
+    try {
+      await apiRequest(`/segredos/${segredo.id}?confirmar=${encodeURIComponent(segredo.chave)}`, { token, method: "DELETE" });
+      toast({ title: "Segredo apagado", description: "Pode criar de novo com a mesma chave.", kind: "success" });
+      setConfirmacao("");
+      await onApagado();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível apagar.");
+    } finally {
+      setApagando(false);
+    }
+  }
+
+  return (
+    <Modal open={!!segredo} onClose={fechar} title="Apagar segredo" description={segredo ? `${segredo.nome} (${segredo.chave})` : undefined}
+      footer={<><Button variant="ghost" onClick={fechar}>Cancelar</Button>
+        <Button variant="destructive" onClick={() => void apagar()} disabled={!confere || apagando}>{apagando ? "Apagando..." : "Apagar de vez"}</Button></>}>
+      {segredo && (
+        <div className="space-y-4">
+          <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            Os valores, as versões e as ligações saem e não têm volta. Fica só o registro na auditoria (sem os valores).
+            {segredo.automacoes.length > 0
+              ? <> Estas automações deixam de receber o segredo: <strong>{segredo.automacoes.map((a) => a.nome).join(", ")}</strong>.</>
+              : " Nenhuma automação usa este segredo."}
+          </p>
+          {erro && <p role="alert" className="text-sm text-destructive">{erro}</p>}
+          <Field><Label htmlFor="apagar-confirmacao">Para confirmar, digite a chave <span className="font-mono">{segredo.chave}</span></Label>
+            <Input id="apagar-confirmacao" className="font-mono" value={confirmacao} autoComplete="off" onChange={(e) => setConfirmacao(e.target.value)} /></Field>
+        </div>
+      )}
     </Modal>
   );
 }

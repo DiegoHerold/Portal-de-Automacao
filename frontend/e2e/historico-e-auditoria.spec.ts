@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * clicar na pessoa e ver só ela). API simulada só aqui.
  */
 
-const TELAS = "../docs/historico-auditoria-telas";
+const TELAS = "test-results/telas/historico-auditoria";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; busca: URLSearchParams; corpo: unknown };

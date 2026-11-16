@@ -9,7 +9,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * telas de dentro. A API é simulada só aqui.
  */
 
-const TELAS = "../docs/tipografia-telas";
+const TELAS = "test-results/telas/tipografia";
 mkdirSync(TELAS, { recursive: true });
 
 const AUTOMACAO = { id: 7, name: "Integração Contábil · Folha", slug: "ic", key: "dominio.integracao_contabil", category_id: 1, executor_type: "direto",

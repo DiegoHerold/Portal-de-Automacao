@@ -11,7 +11,7 @@ Packages are content-addressed: the same source directory always produces
 the same zip bytes (fixed file order, fixed timestamps), so re-running
 `certification prepare` does not produce a different SHA-256 unless the
 package source actually changed — that is what makes package provisioning
-idempotent (docs/certification-harness.md, "Idempotência do seed").
+idempotent (automation-agent/docs/certification-harness.md, "Idempotência do seed").
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from dataclasses import dataclass
 _FIXED_ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 
 # Same exclusion list as the Catalog's own `build_package` for
-# GitHub-imported packages (see docs/automation-package.md), so
+# GitHub-imported packages (see contracts/manifests/), so
 # certification packages are built the same way real packages are.
 _EXCLUDED_DIR_NAMES = {".git", ".venv", "venv", "__pycache__", "tests", ".pytest_cache", "node_modules"}
 _EXCLUDED_FILE_SUFFIXES = (".pyc", ".pyo")

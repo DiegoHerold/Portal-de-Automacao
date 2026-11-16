@@ -35,8 +35,8 @@ class ScheduleCreateRequest(BaseModel):
     def _check_recurrence_fields(self) -> "ScheduleCreateRequest":
         if self.target_type == "automation" and self.automation_id is None and self.automation_version_id is None:
             raise ValueError("automation_id or automation_version_id is required for automation schedules.")
-        if self.target_type == "flow" and self.flow_version_id is None:
-            raise ValueError("flow_version_id is required for Flow schedules.")
+        if self.target_type == "flow":
+            raise ValueError("Agendar fluxo ainda não está disponível.")
         if self.schedule_type == "interval":
             if self.interval_seconds is None or self.interval_seconds < 60:
                 raise ValueError("interval_seconds must be greater than or equal to 60.")

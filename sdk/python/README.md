@@ -58,6 +58,22 @@ with Automacao.conectar(versao_automacao="2.3.0") as a:
 | `a.email_enviado_pela_maquina(para, assunto, meio=)` | Sem evento: registra no Portal um e-mail mandado pela máquina |
 | `a.segredo(chave, campo=)`, `a.segredos(*chaves)` | Sem evento: acesso (usuário, senha...) ligado à automação no Portal (0.5.0) |
 
+### Parte do trabalho (0.6.0)
+
+Quando um fluxo do Portal **divide o trabalho de um item entre máquinas** (ex.: os 50 TXT da Planet em 5
+partes), cada job recebe só a sua fatia. Declare no manifesto, em `execucao`, `"aceita_partes": true` e
+processe só a fatia:
+
+```python
+from portal_automacoes import job_atual, parte_do_trabalho
+
+parte = parte_do_trabalho(job_atual())          # no modo direto, também: job.parte
+arquivos = parte.fatias if parte else todos_os_arquivos()   # sem parte: o trabalho inteiro
+```
+
+`parte.indice` (1, 2, 3...) e `parte.total` dizem qual é a parte. As partes que falharem voltam para o fluxo
+em `fatias_com_erro`, e ele pode repetir só elas.
+
 ### E-mail pelo Portal (0.5.0)
 
 O padrão é a automação pedir e o Portal mandar (Microsoft Graph, remetente do Portal), com tudo

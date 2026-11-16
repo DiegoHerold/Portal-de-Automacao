@@ -9,7 +9,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * execução, Executar); a página da automação sem o Executar repetido; a aba Técnico em blocos.
  */
 
-const TELAS = "../docs/catalogo-telas";
+const TELAS = "test-results/telas/catalogo";
 mkdirSync(TELAS, { recursive: true });
 
 const FORMULARIO = {

@@ -4,7 +4,7 @@ against the grammar documented in modules/catalog/domain/manifest.py.
 
 For a full round-trip through the real parser (parse_automation_manifest),
 run this suite inside the backend container on Python >= 3.11 — see
-docs/certification-harness.md, "Testes do Harness".
+automation-agent/docs/certification-harness.md, "Testes do Harness".
 """
 
 from __future__ import annotations

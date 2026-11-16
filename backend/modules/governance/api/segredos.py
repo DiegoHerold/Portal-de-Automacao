@@ -5,7 +5,8 @@
 - ``POST /segredos``: cria com ``campos`` ``[{"nome", "oculto", "valor"}]`` (``segredos.gerenciar``).
 - ``PUT /segredos/{id}/campos``: os campos passam a ser os enviados; ``valor`` vazio mantém o
   atual; valor trocado gera versão nova (``segredos.gerenciar``).
-- ``PUT /segredos/{id}``: nome, descrição e situação (ativo/desativado) (``segredos.gerenciar``).
+- ``PUT /segredos/{id}``: chave, nome, descrição e situação (ativo/desativado) (``segredos.gerenciar``).
+- ``DELETE /segredos/{id}?confirmar=<chave>``: apaga segredo, versões e ligações; sem volta (``segredos.gerenciar``).
 - ``PUT /segredos/{id}/automacoes``: quais automações usam este segredo (``segredos.gerenciar``).
 - ``GET /segredos/{id}/versoes``: histórico de versões, sem valor (``segredos.ver``).
 - ``GET /segredos/da-automacao/{id}``: os segredos que a automação usa (``segredos.ver``).
@@ -93,6 +94,11 @@ def versoes(segredo_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
 def definir_automacoes(segredo_id: str, corpo: dict[str, Any] = Body(...), db: Session = Depends(get_db),
                        user: Any = Depends(get_current_user)) -> None:
     _fazer(db, lambda: segredos(db).definir_automacoes(user, segredo_id, corpo.get("automacoes")))
+
+
+@router.delete("/{segredo_id}", status_code=204, response_model=None, response_class=Response, dependencies=GERENCIAR)
+def apagar(segredo_id: str, confirmar: str = "", db: Session = Depends(get_db), user: Any = Depends(get_current_user)) -> None:
+    _fazer(db, lambda: segredos(db).apagar(user, segredo_id, confirmar))
 
 
 @router.put("/{segredo_id}", status_code=204, response_model=None, response_class=Response, dependencies=GERENCIAR)

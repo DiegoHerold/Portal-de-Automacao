@@ -1,6 +1,6 @@
 export type RecurrenceType = "daily" | "weekly" | "monthly" | "once";
 
-/** "automation" agenda uma Automation direta; "flow" agenda uma FlowVersion publicada. */
+/** "automation" agenda uma Automation direta; "flow" volta na Fase 8 dos Fluxos em blocos (ADR-021). */
 export type TargetType = "automation" | "flow";
 
 /** null/"cron" = recorrência estruturada (recurrence_type); "interval" = a cada N segundos; "once" = data única. */
@@ -212,3 +212,6 @@ export type SchedulePreviewPayload = {
 export type SchedulePreviewResponse = {
   occurrences: string[];
 };
+
+/** Fluxo que pode ser agendado. Vazio até a Fase 8 dos Fluxos em blocos (ADR-021). */
+export type FluxoAgendavel = { id: string; name: string };

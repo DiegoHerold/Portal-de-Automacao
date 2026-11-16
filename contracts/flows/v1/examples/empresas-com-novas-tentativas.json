@@ -1,0 +1,37 @@
+{
+  "contrato": "fluxo/v1",
+  "entradas": [
+    { "nome": "empresas", "tipo": { "lista": "texto" }, "obrigatoria": true, "rotulo": "Empresas" },
+    { "nome": "competencia", "tipo": "texto", "obrigatoria": true, "rotulo": "Competência (MM/AAAA)" }
+  ],
+  "variaveis": [
+    { "nome": "pendentes", "tipo": { "lista": "texto" } },
+    { "nome": "resultado", "tipo": "resultado" }
+  ],
+  "funcoes": [
+    { "nome": "falhou", "parametros": [{ "nome": "r", "tipo": "resultado" }], "tipo_retorno": "booleano",
+      "retorno": { "tipo": "op", "op": "!=", "a": { "tipo": "campo", "de": { "tipo": "var", "nome": "r" }, "campo": "situacao" },
+                   "b": { "tipo": "texto", "valor": "ok" } } }
+  ],
+  "corpo": [
+    { "id": "b1", "tipo": "definir", "variavel": "pendentes", "valor": { "tipo": "lista", "itens": [] } },
+    { "id": "b2", "tipo": "para_cada", "variavel": "empresa", "lista": { "tipo": "entrada", "nome": "empresas" }, "corpo": [
+      { "id": "b3", "tipo": "executar_automacao", "automacao": "integracao_contabil", "guardar_em": "resultado",
+        "itens": { "tipo": "lista", "itens": [{ "tipo": "var", "nome": "empresa" }] },
+        "parametros": { "competencia": { "tipo": "entrada", "nome": "competencia" } },
+        "novas_tentativas": { "ate": 3, "esperar_segundos": 300 } },
+      { "id": "b4", "tipo": "se", "casos": [{
+        "condicao": { "tipo": "chamar", "funcao": "falhou", "args": [{ "tipo": "var", "nome": "resultado" }] },
+        "corpo": [{ "id": "b5", "tipo": "adicionar", "lista": "pendentes", "valor": { "tipo": "var", "nome": "empresa" } }] }] }
+    ] },
+    { "id": "b6", "tipo": "se", "casos": [{
+      "condicao": { "tipo": "nao", "a": { "tipo": "fn", "nome": "vazio", "args": [{ "tipo": "var", "nome": "pendentes" }] } },
+      "corpo": [{ "id": "b7", "tipo": "avisar", "para": { "tipo": "quem_executou" },
+        "texto": { "tipo": "fn", "nome": "juntar_texto", "args": [
+          { "tipo": "texto", "valor": "Empresas com erro na Integração: " },
+          { "tipo": "fn", "nome": "para_texto", "args": [{ "tipo": "var", "nome": "pendentes" }] }] } }] }] },
+    { "id": "b8", "tipo": "concluir", "valor": { "tipo": "op", "op": "-",
+      "a": { "tipo": "fn", "nome": "tamanho", "args": [{ "tipo": "entrada", "nome": "empresas" }] },
+      "b": { "tipo": "fn", "nome": "tamanho", "args": [{ "tipo": "var", "nome": "pendentes" }] } } }
+  ]
+}

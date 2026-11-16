@@ -12,7 +12,7 @@ All three are written under $AUTOMATION_ARTIFACTS_PATH. ResultCollector
 walks that directory after the process exits, computes a SHA-256 for each
 file and hands the list to ExecutionManager, which is what ultimately drives
 the real artifact.created -> portal.ack -> HTTPS PUT -> artifact.uploaded
-lifecycle documented in docs/artifact-integration-report.md. Nothing here
+artifact lifecycle. Nothing here
 talks to the Agent or Portal directly — the package only has to produce
 files in the right place.
 """

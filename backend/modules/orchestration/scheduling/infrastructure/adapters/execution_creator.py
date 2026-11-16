@@ -10,8 +10,6 @@ from modules.dispatch.application.use_cases import ScheduleTaskExecution
 from modules.dispatch.infrastructure.adapters import build_dispatch_adapters
 from modules.orchestration.application.dto import ActorDTO, CreateAutomationExecutionCommand
 from modules.orchestration.application.use_cases import CreateAutomationExecution, GetExecutionDetails
-from modules.orchestration.flows.application import CreateFlowExecution
-from modules.orchestration.flows.infrastructure.adapters import build_flow_adapters
 from modules.orchestration.infrastructure.adapters import build_orchestration_adapters
 from modules.orchestration.scheduling.application.dto import ScheduleDTO, ScheduleExecutionDTO
 
@@ -22,35 +20,8 @@ class ModuleScheduleExecutionCreator:
 
     def create_execution(self, schedule: ScheduleDTO, schedule_execution: ScheduleExecutionDTO, actor: ActorDTO) -> dict:
         if schedule.target_type == "flow":
-            return self._create_flow(schedule, schedule_execution, actor)
+            raise ValueError("Agendar fluxo ainda não está disponível.")
         return self._create_automation(schedule, schedule_execution, actor)
-
-    def _create_flow(self, schedule: ScheduleDTO, schedule_execution: ScheduleExecutionDTO, actor: ActorDTO) -> dict:
-        if not schedule.flow_version_id:
-            raise ValueError("Flow schedule requires flow_version_id.")
-        adapters = build_flow_adapters(self.db)
-        details = CreateFlowExecution(
-            adapters.flows,
-            adapters.versions,
-            adapters.nodes,
-            adapters.edges,
-            adapters.flow_executions,
-            adapters.node_executions,
-            adapters.executions,
-            adapters.tasks,
-            adapters.automation_versions,
-            adapters.outbox,
-            adapters.audit,
-            adapters.transaction,
-        ).execute(
-            flow_version_id=schedule.flow_version_id,
-            actor=actor,
-            input=schedule.payload,
-            origin="schedule",
-            schedule_execution_id=schedule_execution.id,
-            correlation_id=schedule_execution.id,
-        )
-        return {"execution_id": details.flow_execution.execution_id, "flow_execution_id": details.flow_execution.id, "target_type": "flow"}
 
     def _create_automation(self, schedule: ScheduleDTO, schedule_execution: ScheduleExecutionDTO, actor: ActorDTO) -> dict:
         version_id = schedule.automation_version_id

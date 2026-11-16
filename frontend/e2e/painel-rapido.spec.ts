@@ -9,7 +9,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * automações, com filtro por máquina e "Repetir" com os mesmos itens. API simulada só aqui.
  */
 
-const TELAS = "../docs/painel-rapido-telas";
+const TELAS = "test-results/telas/painel-rapido";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };

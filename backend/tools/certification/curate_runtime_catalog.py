@@ -36,7 +36,7 @@ realmente sabe executar, cobrindo os 3 usos que a Biason precisa:
                          (entrypoint browser_playwright - precisa de
                          BrowserPoolSize>0, ja corrigido, e do bundle
                          Playwright+Chromium provisionado por
-                         provision-runtimes.ps1).
+                         scripts/provision-runtimes.ps1).
 
 Qualquer OUTRO runtime_id no catalogo (node-browser, powershell-standard,
 python-background, standalone-executable, playwright-browser duplicado,

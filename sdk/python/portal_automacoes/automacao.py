@@ -60,7 +60,7 @@ from .transporte_agente import TransporteAgente
 from .enderecos import ligado
 from .transporte_direto import TransporteDireto
 
-VERSAO_SDK = "0.5.0"
+VERSAO_SDK = "0.6.0"
 INTERVALO_COMANDOS_S = 2.0
 PRAZO_CANCELAR_S = 60.0  # depois de "cancelar", quanto a automação tem para parar sozinha
 FOLGA_ENCERRAR_S = 15.0  # depois da interrupção, quanto até encerrar o processo (só processo próprio)

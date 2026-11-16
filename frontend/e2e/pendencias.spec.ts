@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * continuou; a página Pendências lista o que aguarda.
  */
 
-const TELAS = "../docs/pendencias-telas";
+const TELAS = "test-results/telas/pendencias";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string };

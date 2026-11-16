@@ -183,6 +183,57 @@ def test_segredo_com_campos_visiveis_e_ocultos(cliente, sessao, admin) -> None:
           "valor em branco mantém; ocultar não cria versão; tirar campo cria")
 
 
+def test_editar_nome_chave_campo_e_apagar_o_segredo(cliente, sessao, admin) -> None:
+    chave = f"banco.{uuid.uuid4().hex[:6]}"
+    senha = "Senha-Para-Apagar-2026"
+    criado = cliente.post("/api/v1/segredos", json={"chave": chave, "nome": "Banco velho", "campos": [
+        {"nome": "usuario", "oculto": False, "valor": "folha"}, {"nome": "senha", "oculto": True, "valor": senha}]})
+    sid = criado.json()["id"]
+    outro = cliente.post("/api/v1/segredos", json={"chave": f"{chave}.outro", "nome": "Outro", "campos": [
+        {"nome": "senha", "oculto": True, "valor": "x"}]}).json()["id"]
+
+    def na_lista() -> dict:
+        return next(s for s in cliente.get("/api/v1/segredos").json()["segredos"] if s["id"] == sid)
+
+    # Nome, chave e descrição; chave repetida ou inválida recusa.
+    nova_chave = f"{chave}.novo"
+    assert cliente.put(f"/api/v1/segredos/{sid}", json={"chave": f"{chave}.outro"}).status_code == 422
+    assert cliente.put(f"/api/v1/segredos/{sid}", json={"chave": "com espaço!"}).status_code == 422
+    r = cliente.put(f"/api/v1/segredos/{sid}", json={"nome": "Banco da Folha", "chave": nova_chave, "descricao": "acesso"})
+    assert r.status_code == 204, r.text
+    linha = na_lista()
+    assert (linha["nome"], linha["chave"], linha["descricao"]) == ("Banco da Folha", nova_chave, "acesso")
+    assert cliente.put(f"/api/v1/segredos/{sid}", json={"chave": nova_chave}).status_code == 204  # igual: nada muda
+
+    # Renomear campo: o nome novo precisa de valor (oculto não se copia).
+    renomeado = [{"nome": "login", "oculto": False, "valor": ""}, {"nome": "senha", "oculto": True, "valor": ""}]
+    assert cliente.put(f"/api/v1/segredos/{sid}/campos", json={"campos": renomeado}).status_code == 422
+    renomeado[0]["valor"] = "folha"
+    assert cliente.put(f"/api/v1/segredos/{sid}/campos", json={"campos": renomeado}).status_code == 204
+    assert [c["nome"] for c in na_lista()["campos"]] == ["login", "senha"]
+
+    # Apagar: precisa confirmar com a chave; leva versões e ligações; fica na auditoria (sem valor).
+    assert cliente.post(f"/api/v1/segredos/da-automacao/{admin.automation_id}/{sid}").status_code == 204
+    assert cliente.delete(f"/api/v1/segredos/{sid}").status_code == 422
+    assert cliente.delete(f"/api/v1/segredos/{sid}", params={"confirmar": chave}).status_code == 422  # chave antiga
+    assert cliente.delete(f"/api/v1/segredos/{sid}", params={"confirmar": nova_chave}).status_code == 204
+    ids = {s["id"] for s in cliente.get("/api/v1/segredos").json()["segredos"]}
+    assert sid not in ids and outro in ids
+    sobras = sessao.execute(text("SELECT (SELECT count(*) FROM secret_versions WHERE secret_id = :s)"
+                                 " + (SELECT count(*) FROM secret_grants WHERE secret_id = :s)"), {"s": sid}).scalar()
+    assert sobras == 0
+    assert all(s["id"] != sid for s in cliente.get(f"/api/v1/segredos/da-automacao/{admin.automation_id}").json()["segredos"])
+    assert cliente.delete(f"/api/v1/segredos/{sid}", params={"confirmar": nova_chave}).status_code == 404
+    apagado = sessao.execute(text("SELECT before FROM audit_events WHERE action = 'segredo.apagado' AND resource_id = :s"),
+                             {"s": sid}).scalar_one()
+    assert apagado["chave"] == nova_chave and apagado["automacoes"] == [admin.automation_id]
+    assert senha not in json.dumps(apagado)
+    # A mesma chave pode ser usada de novo para refazer.
+    refeito = cliente.post("/api/v1/segredos", json={"chave": nova_chave, "nome": "Refeito", "campos": [
+        {"nome": "senha", "oculto": True, "valor": "nova"}]})
+    assert refeito.status_code == 201, refeito.text
+
+
 # -- contas de serviço -------------------------------------------------------------------------
 @contextmanager
 def _sem_usuario_injetado(cliente):

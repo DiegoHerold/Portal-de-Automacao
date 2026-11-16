@@ -1,7 +1,7 @@
 """Itens da execução e plano de tarefas por etapa.
 
 Orchestration é dono de ``execution_items`` e ``step_plans``. O Telemetry, ao receber os
-eventos da automação, pede as gravações por este caso de uso (docs/modules.md: Telemetry
+eventos da automação, pede as gravações por este caso de uso (docs/visao-geral.md: Telemetry
 não altera tabela de Orchestration diretamente).
 """
 

@@ -354,6 +354,12 @@ class Segredos:
     def mudar(self, ator: Any, segredo_id: str, dados: dict[str, Any]) -> None:
         segredo = self._segredo(segredo_id)
         mudanca: dict[str, Any] = {}
+        if "chave" in dados:
+            chave = normalizar_chave(dados["chave"])
+            if chave != segredo.key:
+                if self.repo.chave_existe(chave):
+                    raise SegredoInvalido("Já existe um segredo com esta chave.")
+                mudanca["key"] = chave
         if "nome" in dados:
             nome = str(dados["nome"] or "").strip()
             if not nome:
@@ -365,12 +371,29 @@ class Segredos:
             if dados["situacao"] not in SITUACOES:
                 raise SegredoInvalido("Situação: active ou disabled.")
             mudanca["status"] = dados["situacao"]
-        if not mudanca:
+        if not mudanca and not any(k in dados for k in ("chave", "nome", "descricao", "situacao")):
             raise SegredoInvalido("Nada para mudar.")
-        antes = {"nome": segredo.name, "situacao": segredo.status}
+        if not mudanca:
+            return  # mandou os mesmos valores
+        antes = {"chave": segredo.key, "nome": segredo.name, "descricao": segredo.description, "situacao": segredo.status}
         self.repo.mudar(segredo, mudanca, self._agora())
         self._auditar_gestao(ator, "segredo.alterado", segredo.id, antes=antes,
-                             depois={"nome": segredo.name, "situacao": segredo.status})
+                             depois={"chave": segredo.key, "nome": segredo.name, "descricao": segredo.description,
+                                     "situacao": segredo.status})
+
+    def apagar(self, ator: Any, segredo_id: str, confirmacao: Any) -> None:
+        """Apaga o segredo, as versões e as ligações. Sem volta: pede a chave como confirmação.
+
+        A auditoria guarda chave, nome, campos e as automações que usavam (nunca os valores).
+        """
+        segredo = self._segredo(segredo_id)
+        if str(confirmacao or "").strip() != segredo.key:
+            raise SegredoInvalido(f"Para apagar, confirme digitando a chave do segredo ({segredo.key}).")
+        automacoes = sorted(int(g.grantee_id) for g in self.repo.ligacoes(segredo_id=segredo.id, agora=self._agora())
+                            if g.grantee_id.isdigit())
+        antes = {"chave": segredo.key, "nome": segredo.name, "campos": campos_de(segredo), "automacoes": automacoes}
+        self.repo.apagar(segredo)
+        self._auditar_gestao(ator, "segredo.apagado", segredo_id, antes=antes)
 
     def versoes(self, segredo_id: str) -> list[dict[str, Any]]:
         segredo = self._segredo(segredo_id)

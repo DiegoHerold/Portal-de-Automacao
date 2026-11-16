@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * as imagens são telas sintéticas geradas para o teste (e2e/fixtures).
  */
 
-const TELAS = "../docs/fase-4-telas";
+const TELAS = "test-results/telas/fase-4";
 const IMAGENS: Record<string, Buffer> = {
   img_a: readFileSync(path.join(__dirname, "fixtures", "tela-a.jpg")),
   img_b: readFileSync(path.join(__dirname, "fixtures", "tela-b.jpg")),

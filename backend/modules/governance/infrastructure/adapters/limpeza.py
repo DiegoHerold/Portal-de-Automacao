@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from modules.dispatch.infrastructure import limpeza as dispatch
 from modules.fleet.infrastructure import limpeza as fleet
+from modules.orchestration.fluxos import limpeza as fluxos
 from modules.orchestration.infrastructure import limpeza as orchestration
 from modules.shared.infrastructure import limpeza as shared
 from modules.telemetry.infrastructure import limpeza as telemetry
@@ -33,6 +34,7 @@ LIMPADORES: dict[str, Limpador] = {
     "execucoes.decisoes": dispatch.decisoes,
     "execucoes.reconciliacoes": dispatch.reconciliacoes,
     "execucoes.webhooks": orchestration.chamadas_de_webhook,
+    "fluxos.passos": fluxos.passos,
 }
 
 

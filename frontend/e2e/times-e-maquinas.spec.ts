@@ -9,7 +9,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * os times no cadastro do usuário. A API é simulada só aqui.
  */
 
-const TELAS = "../docs/times-e-maquinas-telas";
+const TELAS = "test-results/telas/times-e-maquinas";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };

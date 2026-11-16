@@ -8,7 +8,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { DEFAULT_TIMEZONE, STATUS_FILTER_OPTIONS, type ScheduleFilters } from "@/lib/schedule-filters";
 import { cn } from "@/lib/utils";
 import type { Automation } from "@/types/automation";
-import type { Flow } from "@/types/flow";
+import type { FluxoAgendavel as Flow } from "@/types/schedule";
 
 /**
  * Nível 3 — filtros avançados (seção 7). Abre em Sheet, não ocupa espaço permanente do
@@ -92,7 +92,7 @@ export function SchedulesFilterSheet({
         <section className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de destino</h3>
           <div className="grid grid-cols-3 gap-2">
-            {(["all", "automation", "flow"] as const).map((t) => (
+            {(["all", "automation"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -133,25 +133,6 @@ export function SchedulesFilterSheet({
                 <label key={a.id} className="flex items-center gap-2 text-xs">
                   <input type="checkbox" className="h-3.5 w-3.5 accent-primary" checked={draft.automationIds.includes(a.id)} onChange={() => toggleAutomation(a.id)} />
                   <span className="truncate">{a.name}</span>
-                </label>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {draft.targetType !== "automation" && (
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fluxos específicos</h3>
-              {draft.flowIds.length > 0 && <span className="text-xs text-muted-foreground">{draft.flowIds.length} selecionados</span>}
-            </div>
-            <Input placeholder="Buscar fluxo..." value={flowSearch} onChange={(e) => setFlowSearch(e.target.value)} className="h-8 text-xs" />
-            <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-              {visibleFlows.length === 0 && <p className="text-xs text-muted-foreground">Nenhum fluxo encontrado.</p>}
-              {visibleFlows.map((f) => (
-                <label key={f.id} className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" className="h-3.5 w-3.5 accent-primary" checked={draft.flowIds.includes(f.id)} onChange={() => toggleFlow(f.id)} />
-                  <span className="truncate">{f.name}</span>
                 </label>
               ))}
             </div>

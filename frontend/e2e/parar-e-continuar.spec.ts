@@ -9,7 +9,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * que uma execução não anda (cancelando, parando, pausa, espera, sem sinal). API simulada só aqui.
  */
 
-const TELAS = "../docs/parar-e-continuar-telas";
+const TELAS = "test-results/telas/parar-e-continuar";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };

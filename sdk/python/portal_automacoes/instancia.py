@@ -53,6 +53,13 @@ class Job:
     parametros: dict[str, Any]
     itens: list[dict[str, Any]]
 
+    @property
+    def parte(self) -> Any:
+        """A parte do trabalho deste job (fluxo dividido entre máquinas), ou ``None``. Ver ``partes.py``."""
+        from .partes import parte_do_trabalho
+
+        return parte_do_trabalho(self)
+
 
 class Instancia:
     def __init__(self, portal: str, instancia_id: str, chave_privada: Any, arquivo_ca: str | None,

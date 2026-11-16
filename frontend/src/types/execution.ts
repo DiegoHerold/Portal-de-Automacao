@@ -280,3 +280,30 @@ export type ExecutionArtifact = {
   failed_at: string | null;
   failure_reason: string | null;
 };
+
+/** Tarefa (job) de uma execução, como a API de execuções devolve. */
+export type TaskExecution = {
+  id: string;
+  execution_id: string;
+  automation_version_id: number;
+  status: string;
+  priority: number;
+  parameters: Record<string, unknown>;
+  input: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  retry_policy: Record<string, unknown>;
+  timeout_policy: Record<string, unknown>;
+  created_at: string;
+  ready_at: string | null;
+  queued_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  current_attempt_number: number;
+  failure_summary: string | null;
+  requirements_snapshot: Record<string, unknown>;
+  available_at: string | null;
+  scheduling_attempts: number;
+  last_scheduling_attempt_at: string | null;
+  next_scheduling_attempt_at: string | null;
+  last_scheduling_failure: string | null;
+};

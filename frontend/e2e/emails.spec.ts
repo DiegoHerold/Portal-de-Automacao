@@ -9,7 +9,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * pela máquina; detalhe com a mensagem; reenviar; domínios permitidos; e-mail de teste.
  */
 
-const TELAS = "../docs/emails-telas";
+const TELAS = "test-results/telas/emails";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };

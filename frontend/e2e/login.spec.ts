@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * pelo link do e-mail (o token vem no fragmento #t=, não vai ao servidor na URL).
  */
 
-const TELAS = "../docs/login-telas";
+const TELAS = "test-results/telas/login";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: Record<string, unknown> | null };

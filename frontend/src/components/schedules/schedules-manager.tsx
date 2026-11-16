@@ -33,7 +33,7 @@ import {
 import { parseScheduleView, scheduleViewHeaderLabel, scheduleViewRange, stepScheduleAnchor, type ScheduleView } from "@/lib/schedule-view";
 import { relativeFromNow } from "@/lib/utils";
 import type { Automation } from "@/types/automation";
-import type { Flow } from "@/types/flow";
+import type { FluxoAgendavel as Flow } from "@/types/schedule";
 import type { Density } from "@/components/schedules/schedule-calendar-item";
 import type { ScheduleCalendarItem, ScheduleCalendarResponse, TargetType } from "@/types/schedule";
 
@@ -68,7 +68,8 @@ export function SchedulesManager() {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   const automationsQuery = useApi<Automation[]>("/automations");
-  const flowsQuery = useApi<Flow[]>("/flows");
+  // Fluxos em blocos voltam a ser agendáveis na Fase 8 (ADR-021): até lá, nenhum.
+  const flowsQuery = { data: [] as Flow[] };
 
   const range = useMemo(() => scheduleViewRange(view, anchor), [view, anchor]);
 

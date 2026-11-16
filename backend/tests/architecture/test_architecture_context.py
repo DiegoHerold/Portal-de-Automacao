@@ -14,56 +14,44 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_official_architecture_names_control_and_execution_planes() -> None:
-    architecture = read(DOCS / "architecture.md")
+def test_overview_names_control_and_execution_planes() -> None:
+    visao = read(DOCS / "visao-geral.md")
 
-    assert "Portal de Automacoes - control plane" in architecture
-    assert "Automation Agent - execution plane" in architecture
-    assert "WebSocket, Redis, Celery e mensageria nao sao fontes de verdade" in architecture
+    assert "control plane" in visao
+    assert "execution plane" in visao
+    assert "O PostgreSQL é a fonte de verdade" in visao
+    assert "transporte ou aceleração" in visao
 
 
-def test_required_architecture_documents_exist() -> None:
-    required_docs = [
-        "architecture.md",
-        "backend-classification.md",
-        "catalog-migration-inventory.md",
-        "domain-model.md",
-        "modules.md",
-        "protocol.md",
-        "frontend-integration.md",
-        "agent-lifecycle.md",
-        "execution-lifecycle.md",
-        "state-machines.md",
-        "capabilities.md",
-        "capacity-model.md",
-        "scheduler.md",
-        "events.md",
-        "reconnection.md",
-        "reliability.md",
-        "persistence-reliability.md",
-        "fleet-gateway-migration-inventory.md",
-        "agent-gateway.md",
-        "security.md",
-        "roadmap.md",
-        "migration.md",
-    ]
+# Cada aba do menu (frontend/src/lib/navigation.ts) tem o seu documento em docs/telas/.
+ABAS = {
+    "/dashboard": "painel", "/fila": "fila", "/maquinas": "maquinas", "/historico": "historico",
+    "/pendencias": "pendencias", "/executions": "execucoes", "/flows": "fluxos", "/webhooks": "webhooks",
+    "/schedules": "agendamentos", "/automations": "automacoes", "/categories": "categorias", "/runtimes": "runtimes",
+    "/workers": "agent", "/storage": "armazenamento", "/audit": "auditoria", "/secrets": "segredos",
+    "/service-accounts": "contas-de-servico", "/users": "usuarios", "/teams": "times", "/roles": "papeis",
+    "/organizations": "organizacoes", "/governance/limits": "limites", "/governance/retention": "retencao",
+    "/emails": "emails", "/settings": "configuracoes",
+}
 
-    missing = [name for name in required_docs if not (DOCS / name).exists()]
+
+def test_required_documents_exist() -> None:
+    required = ["README.md", "visao-geral.md", "decisoes.md", "design-system.md", "telas/login.md"]
+    required += [f"telas/{nome}.md" for nome in ABAS.values()]
+
+    missing = [name for name in required if not (DOCS / name).exists()]
 
     assert missing == []
 
 
-def test_legacy_docs_are_marked_as_compatibility_or_superseded() -> None:
-    legacy_docs = [
-        DOCS / "flows.md",
-        DOCS / "worker-agent.md",
-        DOCS / "automation-execution.md",
-        DOCS / "api-contract.md",
-    ]
+def test_every_menu_tab_has_a_document() -> None:
+    import re
 
-    for path in legacy_docs:
-        content = read(path).lower()
-        assert "compatibilidade" in content or "superseded" in content
+    navegacao = read(ROOT / "frontend" / "src" / "lib" / "navigation.ts")
+    rotas = set(re.findall(r'href: "(/[^"]*)"', navegacao))
+
+    assert rotas, "o menu mudou de formato"
+    assert sorted(rotas - set(ABAS)) == [], "aba nova no menu sem documento em docs/telas/"
 
 
 def test_protocol_contracts_require_message_identity() -> None:
@@ -106,21 +94,11 @@ def test_rejection_is_not_modeled_as_automation_failure() -> None:
     assert "rejected" not in states["task_execution"]
 
 
-def test_adrs_have_required_sections() -> None:
-    adr_paths = sorted((DOCS / "adrs").glob("ADR-*.md"))
+def test_decisions_keep_every_adr_number() -> None:
+    decisoes = read(DOCS / "decisoes.md")
 
-    assert len(adr_paths) >= 17
-    for path in adr_paths:
-        content = read(path)
-        for section in [
-            "## Contexto",
-            "## Decisao",
-            "## Alternativas consideradas",
-            "## Consequencias",
-            "## Riscos",
-            "## Impacto de migracao",
-        ]:
-            assert section in content, path.name
+    for numero in range(1, 22):
+        assert f"| {numero:03d} |" in decisoes, f"ADR-{numero:03d}"
 
 
 def test_modular_monolith_context_directories_exist() -> None:
@@ -180,24 +158,16 @@ def test_domain_modules_do_not_import_frameworks_or_orms() -> None:
         assert not any(import_text in source for import_text in forbidden_imports), path
 
 
-def test_frontend_is_preserved_for_later_reconnection() -> None:
-    integration = read(DOCS / "frontend-integration.md").lower()
+def test_frontend_shell_and_design_rules_exist() -> None:
+    design = read(DOCS / "design-system.md")
     expected_frontend_files = [
         ROOT / "frontend" / "src" / "components" / "layout" / "app-shell.tsx",
         ROOT / "frontend" / "src" / "app" / "(dashboard)" / "layout.tsx",
         ROOT / "frontend" / "src" / "app" / "(dashboard)" / "dashboard" / "page.tsx",
     ]
 
-    assert "preservar design" in integration
-    assert "nao redesenhar telas" in integration
+    assert "ADR-020" in design
     assert all(path.exists() for path in expected_frontend_files)
-
-
-def test_backend_classification_uses_required_buckets() -> None:
-    classification = read(DOCS / "backend-classification.md")
-
-    for bucket in ["## KEEP", "## MOVE", "## REFACTOR", "## REPLACE", "## DELETE"]:
-        assert bucket in classification
 
 
 def test_contracts_include_official_message_and_rejection_vocabularies() -> None:

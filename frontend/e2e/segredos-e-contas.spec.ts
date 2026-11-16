@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * uma única vez e tem papel e times.
  */
 
-const TELAS = "../docs/segredos-telas";
+const TELAS = "test-results/telas/segredos";
 mkdirSync(TELAS, { recursive: true });
 
 type Pedido = { metodo: string; caminho: string; corpo: unknown };
@@ -192,5 +192,47 @@ test("contas de serviço: papel e times; credencial uma vez só; nova credencial
   await expect(page.getByText("psa_…Xy9z para de funcionar na hora", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Gerar nova" }).click();
   await expect(page.getByTestId("credencial")).toHaveText("psa_OutraCredencial_9876543210zyxwvutsrqpon");
+  expect(erros).toEqual([]);
+});
+
+test("segredos: editar nome e chave avisa o código; renomear campo pede o valor; apagar confirma pela chave", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const { erros, pedidos } = await preparar(page);
+  await abrir(page, "/secrets");
+  await page.locator("[data-segredo='dominio']").getByRole("button", { name: "Acesso à Domínio" }).click();
+  const detalhes = page.getByTestId("detalhes-do-segredo");
+
+  await detalhes.getByRole("button", { name: "Editar nome e chave" }).click();
+  await page.getByLabel("Nome", { exact: true }).fill("Domínio - Folha");
+  await page.getByLabel("Chave", { exact: true }).fill("dominio.folha");
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText('a.segredo("dominio.folha")');
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("Integração Contábil · Folha");
+  await page.screenshot({ path: `${TELAS}/editar-nome-e-chave.png`, animations: "disabled" });
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect.poll(() => pedidos.find((p) => p.caminho === "/segredos/sec_1" && p.metodo === "PUT")?.corpo)
+    .toEqual({ nome: "Domínio - Folha", chave: "dominio.folha", descricao: "Leitura da folha" });
+
+  await detalhes.getByRole("button", { name: "Editar campos" }).click();
+  await page.getByLabel("Nome do campo 2").fill("senha_banco");
+  await expect(page.getByLabel("Valor de senha_banco")).toHaveAttribute("placeholder", "valor de novo (campo renomeado)");
+  await page.getByRole("button", { name: "Salvar campos" }).click();
+  await expect(page.getByText("Preencha o valor dos campos novos.")).toBeVisible();
+  await page.getByLabel("Valor de senha_banco").fill("nova");
+  await page.getByRole("button", { name: "Salvar campos" }).click();
+  await expect.poll(() => pedidos.find((p) => p.caminho === "/segredos/sec_1/campos")?.corpo).toEqual({ campos: [
+    { nome: "usuario", oculto: false, valor: "folha" }, { nome: "senha_banco", oculto: true, valor: "nova" },
+    { nome: "banco", oculto: false, valor: "contabil" }] });
+
+  await detalhes.getByRole("button", { name: "Apagar", exact: true }).click();
+  const apagar = page.getByRole("button", { name: "Apagar de vez" });
+  await expect(page.getByRole("dialog").last().getByRole("alert")).toContainText("Integração Contábil · Folha");
+  await expect(apagar).toBeDisabled();
+  await page.getByLabel("Para confirmar, digite a chave").fill("errada");
+  await expect(apagar).toBeDisabled();
+  await page.getByLabel("Para confirmar, digite a chave").fill("dominio");
+  await page.screenshot({ path: `${TELAS}/apagar-segredo.png`, animations: "disabled" });
+  await apagar.click();
+  await expect.poll(() => pedidos.find((p) => p.metodo === "DELETE" && p.caminho === "/segredos/sec_1")).toBeTruthy();
+  await expect(detalhes).toHaveCount(0);
   expect(erros).toEqual([]);
 });

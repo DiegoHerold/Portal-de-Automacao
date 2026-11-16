@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     Sobe e derruba o Portal de Automacoes nativamente no Windows
-    (docs/deployment.md).
+    (docs/visao-geral.md, "Como rodar").
 
 .DESCRIPTION
     Processos gerenciados: PostgreSQL dedicado, API (uvicorn), worker e beat

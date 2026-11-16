@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from typing import Any
 
 from croniter import croniter
 from sqlalchemy import func, or_, select
@@ -26,12 +27,6 @@ from sqlalchemy.orm import Session
 from modules.access.infrastructure.orm.models import AccessUserRecord
 from modules.catalog.infrastructure.orm.models import CatalogAutomationRecord, CatalogAutomationVersionRecord
 from modules.fleet.infrastructure.orm.models import AgentRecord
-from modules.orchestration.flows.infrastructure.orm.models import (
-    FlowExecutionRecord,
-    FlowNodeExecutionRecord,
-    FlowRecord,
-    FlowVersionRecord,
-)
 from modules.orchestration.infrastructure.orm.models import (
     ExecutionAttemptRecord,
     OrchestrationExecutionRecord,
@@ -341,12 +336,9 @@ def build_schedule_calendar(
         for row in db.scalars(select(OrchestrationExecutionRecord).where(OrchestrationExecutionRecord.id.in_(execution_ids))).all():
             executions_by_id[row.id] = row
 
-    flow_executions_by_id: dict[str, FlowExecutionRecord] = {}
-    if flow_execution_ids:
-        for row in db.scalars(select(FlowExecutionRecord).where(FlowExecutionRecord.id.in_(flow_execution_ids))).all():
-            flow_executions_by_id[row.id] = row
-
-    progress_by_flow_execution = _load_flow_progress(db, flow_execution_ids)
+    # Agendar fluxo ainda não está disponível (docs/telas/fluxos.md): sem execuções de fluxo na agenda.
+    flow_executions_by_id: dict[str, Any] = {}
+    progress_by_flow_execution: dict[str, ScheduleCalendarProgressDTO] = {}
     agent_by_execution = _load_agent_names(db, execution_ids)
     duration_estimates = _load_duration_estimates(db, schedules)
     target_names = _load_target_names(db, schedules)
@@ -459,7 +451,7 @@ def _build_item(
     record: ScheduleExecutionRecord | None,
     now: datetime,
     executions_by_id: dict[str, OrchestrationExecutionRecord],
-    flow_executions_by_id: dict[str, FlowExecutionRecord],
+    flow_executions_by_id: dict[str, Any],
     progress_by_flow_execution: dict[str, ScheduleCalendarProgressDTO],
     agent_by_execution: dict[str, str],
     duration_estimates: dict[tuple[str, str], tuple[float, str, int]],
@@ -649,40 +641,12 @@ def _load_schedules(
             )
         )
     if flow_ids:
-        flow_version_ids = db.scalars(select(FlowVersionRecord.id).where(FlowVersionRecord.flow_id.in_(flow_ids))).all()
-        query = query.where(
-            or_(
-                Schedule.flow_id.in_(flow_ids),
-                Schedule.flow_version_id.in_(flow_version_ids) if flow_version_ids else False,
-            )
-        )
+        query = query.where(Schedule.flow_id.in_(flow_ids))
     if owners:
         query = query.where(Schedule.created_by.in_(owners))
     query = query.where(Schedule.archived_at.is_(None)).order_by(Schedule.id.asc()).limit(MAX_SCHEDULES)
     rows = db.scalars(query).all()
     return [_schedule_to_dto(row) for row in rows]
-
-
-def _load_flow_progress(db: Session, flow_execution_ids: set[str]) -> dict[str, ScheduleCalendarProgressDTO]:
-    if not flow_execution_ids:
-        return {}
-    rows = db.execute(
-        select(FlowNodeExecutionRecord.flow_execution_id, FlowNodeExecutionRecord.status, func.count())
-        .where(FlowNodeExecutionRecord.flow_execution_id.in_(flow_execution_ids))
-        .group_by(FlowNodeExecutionRecord.flow_execution_id, FlowNodeExecutionRecord.status)
-    ).all()
-    buckets: dict[str, dict[str, int]] = {}
-    for flow_execution_id, status, count in rows:
-        buckets.setdefault(flow_execution_id, {})[status] = count
-    result: dict[str, ScheduleCalendarProgressDTO] = {}
-    for flow_execution_id, counts in buckets.items():
-        succeeded = counts.get("succeeded", 0) + counts.get("skipped", 0)
-        running = counts.get("running", 0)
-        failed = counts.get("failed", 0) + counts.get("timed_out", 0) + counts.get("cancelled", 0)
-        total = sum(counts.values())
-        pending = max(total - succeeded - running - failed, 0)
-        result[flow_execution_id] = ScheduleCalendarProgressDTO(total=total, succeeded=succeeded, running=running, failed=failed, pending=pending)
-    return result
 
 
 def _load_agent_names(db: Session, execution_ids: set[str]) -> dict[str, str]:
@@ -704,7 +668,6 @@ def _load_agent_names(db: Session, execution_ids: set[str]) -> dict[str, str]:
 def _load_duration_estimates(db: Session, schedules: list[ScheduleDTO]) -> dict[tuple[str, str], tuple[float, str, int]]:
     automation_version_ids = sorted({str(s.automation_version_id) for s in schedules if s.automation_version_id})
     automation_ids_only = sorted({str(s.automation_id) for s in schedules if s.automation_id and not s.automation_version_id})
-    flow_version_ids = sorted({s.flow_version_id for s in schedules if s.flow_version_id})
 
     result: dict[tuple[str, str], tuple[float, str, int]] = {}
 
@@ -768,33 +731,6 @@ def _load_duration_estimates(db: Session, schedules: list[ScheduleDTO]) -> dict[
                 continue
             result[("automation", str(key))] = (float(avg_seconds), _confidence(count), int(count))
 
-    if flow_version_ids:
-        subq = (
-            select(
-                FlowExecutionRecord.flow_version_id.label("key"),
-                FlowExecutionRecord.started_at.label("started_at"),
-                FlowExecutionRecord.completed_at.label("completed_at"),
-                func.row_number()
-                .over(partition_by=FlowExecutionRecord.flow_version_id, order_by=FlowExecutionRecord.completed_at.desc())
-                .label("rn"),
-            )
-            .where(
-                FlowExecutionRecord.flow_version_id.in_(flow_version_ids),
-                FlowExecutionRecord.status.in_(("succeeded", "partially_succeeded")),
-                FlowExecutionRecord.started_at.is_not(None),
-                FlowExecutionRecord.completed_at.is_not(None),
-            )
-        ).subquery()
-        rows = db.execute(
-            select(subq.c.key, func.avg(func.extract("epoch", subq.c.completed_at - subq.c.started_at)), func.count())
-            .where(subq.c.rn <= DURATION_HISTORY_SAMPLE)
-            .group_by(subq.c.key)
-        ).all()
-        for key, avg_seconds, count in rows:
-            if avg_seconds is None:
-                continue
-            result[("flow_version", str(key))] = (float(avg_seconds), _confidence(count), int(count))
-
     return result
 
 
@@ -835,32 +771,6 @@ def _load_target_names(db: Session, schedules: list[ScheduleDTO]) -> dict[tuple[
             automation_id, version = version_to_automation[int(schedule.automation_version_id)]
         key = ("automation", str(schedule.automation_version_id or schedule.automation_id))
         name = automation_names.get(automation_id, schedule.name or "Automação")
-        result[key] = (name, version)
-
-    flow_version_ids = {s.flow_version_id for s in schedules if s.flow_version_id}
-    version_to_flow: dict[str, tuple[str, str]] = {}
-    if flow_version_ids:
-        for row in db.execute(
-            select(FlowVersionRecord.id, FlowVersionRecord.flow_id, FlowVersionRecord.version).where(FlowVersionRecord.id.in_(flow_version_ids))
-        ).all():
-            version_to_flow[row.id] = (row.flow_id, row.version)
-
-    flow_ids = {s.flow_id for s in schedules if s.flow_id}
-    flow_ids |= {fid for fid, _ in version_to_flow.values()}
-    flow_names: dict[str, str] = {}
-    if flow_ids:
-        for row in db.execute(select(FlowRecord.id, FlowRecord.name).where(FlowRecord.id.in_(flow_ids))).all():
-            flow_names[row.id] = row.name
-
-    for schedule in schedules:
-        if schedule.target_type != "flow":
-            continue
-        flow_id = schedule.flow_id
-        version = None
-        if schedule.flow_version_id and schedule.flow_version_id in version_to_flow:
-            flow_id, version = version_to_flow[schedule.flow_version_id]
-        key = ("flow", str(schedule.flow_version_id))
-        name = flow_names.get(flow_id, schedule.name or "Fluxo")
         result[key] = (name, version)
 
     return result

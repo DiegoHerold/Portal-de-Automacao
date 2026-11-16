@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * o prazo dos arquivos na Retenção. A API é simulada só aqui.
  */
 
-const TELAS = "../docs/fase-8-telas";
+const TELAS = "test-results/telas/fase-8";
 mkdirSync(TELAS, { recursive: true });
 
 const campo = (c: Record<string, unknown>) => ({ obrigatorio: false, padrao: null, opcoes: [], ajuda: null, afeta_trabalho: false,

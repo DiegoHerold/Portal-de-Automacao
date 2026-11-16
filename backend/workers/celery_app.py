@@ -20,6 +20,7 @@ celery_app.conf.task_routes = {
 # Beat only schedules tasks that have already been imported/registered.
 from workers.tasks import schedule_tasks  # noqa: E402,F401
 from workers.tasks import housekeeping_tasks  # noqa: E402,F401
+from workers.tasks import fluxos_tasks  # noqa: E402,F401
 from workers.tasks import dispatch_tasks  # noqa: E402,F401
 from workers.tasks import notificacoes_tasks  # noqa: E402,F401
 from workers.tasks import correio_tasks  # noqa: E402,F401
@@ -29,6 +30,11 @@ celery_app.conf.beat_schedule = {
     "sync-schedules-every-minute": {
         "task": "workers.tasks.schedule_tasks.sync",
         "schedule": 60.0,
+    },
+    # Fluxos em blocos: uma fatia por execução pronta (rodando ou com a espera vencida)
+    "avancar-fluxos-every-2-seconds": {
+        "task": "workers.tasks.fluxos_tasks.avancar",
+        "schedule": 2.0,
     },
     "detect-stale-agents-every-minute": {
         "task": "workers.tasks.housekeeping_tasks.detect_stale_agents",

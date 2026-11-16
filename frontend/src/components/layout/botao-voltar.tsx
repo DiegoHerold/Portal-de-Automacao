@@ -11,7 +11,6 @@ const PRIMEIRA = "portal.voltar.primeira";
 /** Tela "mãe" quando não há para onde voltar (link aberto direto ou numa aba nova). */
 const MAE: Record<string, string> = {
   "/execucoes": "/historico",
-  "/flow-executions": "/executions",
 };
 
 export function telaMae(caminho: string): string {

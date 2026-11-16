@@ -117,6 +117,11 @@
           "type": "boolean",
           "default": false,
           "description": "O estado fica fora da máquina: continuar de onde parou pode ir para outra máquina."
+        },
+        "aceita_partes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Aceita rodar com o trabalho de um item repartido (fluxos: 'Dividir automação' por partes do trabalho). Cada job recebe o parâmetro _parte = {indice, total, fatias} (SDK: job.parte)."
         }
       }
     },

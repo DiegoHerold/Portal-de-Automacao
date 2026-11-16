@@ -7,7 +7,7 @@ serve, o valor padrão, a faixa aceita e onde ela vale. Para criar uma configura
 2. ligue o consumidor: limite -> ``ler_limite(db, CHAVE)`` no ponto onde ele vale;
    limpeza -> uma função no contexto dono da tabela, registrada em
    ``modules/governance/infrastructure/adapters/limpeza.py``;
-3. descreva em ``docs/configuracoes.md``.
+3. descreva em ``docs/telas/limites.md`` ou ``docs/telas/retencao.md``.
 
 Sem linha gravada no banco, vale o padrão daqui: a configuração já funciona na instalação
 e uma mudança no padrão chega a quem nunca a alterou.
@@ -90,12 +90,23 @@ LIMITES: tuple[Limite, ...] = (
            "Quantas conexões de atualização ao vivo (painel, fila, execução) o Portal mantém abertas juntas. "
            "Acima disso, a tela tenta de novo em alguns segundos.", "quantidade", 250, 10, 5000,
            "Avisos ao vivo do Painel, da Fila e do Acompanhar."),
-    # Fluxos
-    Limite("flow.max_nodes", "Fluxos", "Etapas por fluxo",
-           "Quantos nós uma versão de fluxo pode ter.", "quantidade", 100, 1, 1000,
-           "Inclusão de nó num fluxo."),
+    # Fluxos em blocos (ADR-021)
+    Limite("fluxo.max_blocos", "Fluxos", "Blocos por fluxo",
+           "Quantos blocos (comandos e valores) um fluxo pode ter.", "quantidade", 500, 10, 5000,
+           "Salvar e publicar um fluxo."),
+    Limite("fluxo.max_passos", "Fluxos", "Passos por execução",
+           "Quantos blocos uma execução de fluxo pode rodar no total. Protege contra laço sem fim.",
+           "quantidade", 10000, 100, 1000000, "Motor dos fluxos, a cada passo."),
+    Limite("fluxo.max_voltas", "Fluxos", "Voltas por laço",
+           "Quantas voltas um laço (repetir, enquanto, para cada) pode dar.", "quantidade", 1000, 10, 100000,
+           "Motor dos fluxos, a cada volta."),
+    Limite("fluxo.max_duracao_segundos", "Fluxos", "Tempo máximo de um fluxo",
+           "Quanto tempo uma execução de fluxo pode durar, contando as esperas.", "segundos", 604800, 60, 2592000,
+           "Motor dos fluxos, a cada fatia."),
+    Limite("fluxo.max_partes", "Fluxos", "Partes por divisão",
+           "Em quantas partes um passo 'Dividir automação entre máquinas' pode repartir o trabalho.",
+           "quantidade", 50, 2, 500, "Dividir automação, ao pôr na fila."),
 )
-
 
 # --------------------------------------------------------------------------- limpeza
 
@@ -156,6 +167,10 @@ LIMPEZAS: tuple[Limpeza, ...] = (
     Limpeza("execucoes.webhooks", "Execuções", "Chamadas de webhook",
             "Histórico de cada chamada recebida pelos webhooks.",
             "Chamadas mais antigas que o prazo.",
+            90, 7, 3650),
+    Limpeza("fluxos.passos", "Execuções", "Linha do tempo dos fluxos",
+            "Cada bloco executado por um fluxo (o que a tela ao vivo mostra).",
+            "Passos de execuções de fluxo terminadas há mais tempo que o prazo. A execução e o resultado ficam.",
             90, 7, 3650),
     # Guardado sempre (consulta)
     Limpeza("sempre.auditoria", "Guardado sempre", "Auditoria",

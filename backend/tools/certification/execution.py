@@ -1,6 +1,6 @@
 """Create and observe certification executions through the real Portal API.
 
-Per docs/certification-harness.md item 43-46: executions are created with
+Per automation-agent/docs/certification-harness.md item 43-46: executions are created with
 `POST /executions` (never inserted into the database directly), and
 observation polls `GET /executions/{id}` (+ /tasks, /attempts,
 /artifacts) — the same endpoints the frontend uses.
@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from tools.certification.api_client import PortalApiClient
 
-# Real terminal execution states, per docs/execution-lifecycle.md /
+# Real terminal execution states, per contracts/executions/states.json /
 # domain state machine. TIMED_OUT and CANCELLED are terminal alongside
 # SUCCEEDED and FAILED.
 TERMINAL_STATUSES = {"succeeded", "failed", "cancelled", "timed_out"}
@@ -24,7 +24,7 @@ TERMINAL_STATUSES = {"succeeded", "failed", "cancelled", "timed_out"}
 class ExecutionTimeoutError(RuntimeError):
     """The harness's own poll budget was exceeded — NOT the same thing as
     the execution itself reaching a TIMED_OUT terminal state. Section 51 of
-    docs/certification-harness.md is explicit that a harness poll timeout
+    automation-agent/docs/certification-harness.md is explicit that a harness poll timeout
     must never be reported as PASS."""
 
 

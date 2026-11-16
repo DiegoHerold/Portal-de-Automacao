@@ -9,10 +9,10 @@ import { DetailJson } from "@/components/shared/detail-json";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
-import { TimelineTab } from "@/components/flows/execution/timeline-tab";
-import { MetricsTab } from "@/components/flows/execution/metrics-tab";
-import { ArtifactsTab } from "@/components/flows/execution/artifacts-tab";
-import { AttemptsTab } from "@/components/flows/execution/attempts-tab";
+import { TimelineTab } from "@/components/executions/tabs/timeline-tab";
+import { MetricsTab } from "@/components/executions/tabs/metrics-tab";
+import { ArtifactsTab } from "@/components/executions/tabs/artifacts-tab";
+import { AttemptsTab } from "@/components/executions/tabs/attempts-tab";
 import { DispatchDiagnosticsTab } from "@/components/executions/dispatch-diagnostics-tab";
 import { ExecutionLogViewer } from "@/components/executions/execution-log-viewer";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,6 @@ import type {
   ExecutionProcess,
   ExecutionProgress,
 } from "@/types/execution";
-import type { FlowExecution, FlowExecutionDetails } from "@/types/flow";
 
 export function ExecutionDetail({ id }: { id: string }) {
   const { token } = useAuth();
@@ -82,31 +81,7 @@ export function ExecutionDetail({ id }: { id: string }) {
   const processes = useApi<ExecutionProcess[]>(`/executions/${id}/processes`, { pollMs: terminal ? undefined : 8000 });
   const artifacts = useApi<ExecutionArtifact[]>(`/executions/${id}/artifacts`, { pollMs: terminal ? undefined : 8000 });
 
-  const shouldLoadFlowLinks = Boolean(execution && (execution.type === "flow" || tasks.data?.some((task) => stringFromRecord(task.input, "flow_execution_id"))));
-  const flowExecutions = useApi<FlowExecution[]>(shouldLoadFlowLinks ? "/flow-executions?limit=500" : null, { enabled: shouldLoadFlowLinks });
-  const flowExecution = useMemo(() => {
-    if (!flowExecutions.data) return null;
-    const taskFlowIds = new Set((tasks.data ?? []).map((task) => stringFromRecord(task.input, "flow_execution_id")).filter(Boolean));
-    return flowExecutions.data.find((item) => item.execution_id === id || taskFlowIds.has(item.id)) ?? null;
-  }, [flowExecutions.data, tasks.data, id]);
-  const flowDetails = useApi<FlowExecutionDetails>(flowExecution ? `/flow-executions/${flowExecution.id}` : null, { enabled: !!flowExecution });
-
-  const nodeLabelByTask = useMemo(() => {
-    const map = new Map<string, string>();
-    if (flowDetails.data) {
-      flowDetails.data.node_executions.forEach((nodeExecution) => {
-        if (!nodeExecution.task_execution_id) return;
-        const node = flowDetails.data!.nodes.find((item) => item.id === nodeExecution.flow_node_id);
-        map.set(nodeExecution.task_execution_id, node?.name || node?.key || `No ${nodeExecution.flow_node_id.slice(0, 8)}`);
-      });
-    }
-    (tasks.data ?? []).forEach((task) => {
-      if (map.has(task.id)) return;
-      const nodeId = stringFromRecord(task.input, "flow_node_id");
-      if (nodeId) map.set(task.id, `No ${nodeId.slice(0, 8)}`);
-    });
-    return map;
-  }, [flowDetails.data, tasks.data]);
+  const nodeLabelByTask = useMemo(() => new Map<string, string>(), []);
 
   const agentLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -139,8 +114,6 @@ export function ExecutionDetail({ id }: { id: string }) {
     void progress.refetch();
     void processes.refetch();
     void artifacts.refetch();
-    void flowExecutions.refetch();
-    void flowDetails.refetch();
   };
 
   useEffect(() => {
@@ -205,8 +178,6 @@ export function ExecutionDetail({ id }: { id: string }) {
   const telemetry = normalized.telemetry ?? execution.telemetry ?? null;
   const finishedAt = executionFinishedAt(execution);
   const duration = durationBetween(execution.started_at, finishedAt);
-  const flowId = flowDetails.data?.flow_version?.flow_id ?? execution.flow_id ?? null;
-  const flowNodeLinks = flowNodeLinksFor(tasks.data ?? [], flowExecution?.id ?? execution.flow_execution_id ?? null, nodeLabelByTask);
   const logItems = (logs.data?.items ?? []).map((event) => ({
     id: event.id,
     level: event.level ?? "INFO",
@@ -227,13 +198,6 @@ export function ExecutionDetail({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {flowExecution && (
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/flow-executions/${flowExecution.id}`}>
-                <ExternalLink className="h-3.5 w-3.5" /> Monitor do Flow
-              </Link>
-            </Button>
-          )}
           <Button size="sm" variant="outline" onClick={refetchAll}>
             <RotateCw className="h-3.5 w-3.5" /> Atualizar
           </Button>
@@ -274,9 +238,6 @@ export function ExecutionDetail({ id }: { id: string }) {
         <OverviewTab
           execution={execution}
           details={normalized}
-          flowExecution={flowExecution}
-          flowId={flowId}
-          flowNodeLinks={flowNodeLinks}
           progress={progress.data}
           duration={duration}
         />
@@ -359,17 +320,11 @@ export function ExecutionDetail({ id }: { id: string }) {
 function OverviewTab({
   execution,
   details,
-  flowExecution,
-  flowId,
-  flowNodeLinks,
   progress,
   duration,
 }: {
   execution: Execution;
   details: ExecutionDetails;
-  flowExecution: FlowExecution | null;
-  flowId: string | null;
-  flowNodeLinks: Array<{ taskId: string; nodeId: string; label: string; href: string }>;
   progress: ExecutionProgress | null;
   duration: string;
 }) {
@@ -405,45 +360,6 @@ function OverviewTab({
             <InfoRow label="Duração" value={<span className="tabular text-sm">{duration}</span>} />
           </div>
         </SectionCard>
-
-        {(flowExecution || flowId || flowNodeLinks.length > 0) && (
-          <SectionCard title="Fluxo de origem">
-            <div className="space-y-3">
-              {flowExecution && (
-                <InfoRow
-                  label="Monitor"
-                  value={
-                    <Link href={`/flow-executions/${flowExecution.id}`} className="text-sm font-medium text-primary hover:underline">
-                      {flowExecution.id}
-                    </Link>
-                  }
-                />
-              )}
-              {flowId && (
-                <InfoRow
-                  label="Fluxo"
-                  value={
-                    <Link href={`/flows/${flowId}`} className="text-sm font-medium text-primary hover:underline">
-                      {flowId}
-                    </Link>
-                  }
-                />
-              )}
-              {flowNodeLinks.length > 0 && (
-                <div className="border-t border-border pt-3">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Nos</p>
-                  <div className="flex flex-wrap gap-2">
-                    {flowNodeLinks.map((item) => (
-                      <Link key={item.taskId} href={item.href} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/15">
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </SectionCard>
-        )}
 
         <SectionCard title="Progresso">
           <div className="space-y-3">
@@ -713,26 +629,6 @@ function progressLabel(progress: ExecutionProgress | null, fallback?: number | n
 function stringFromRecord(record: Record<string, unknown> | null | undefined, key: string): string | null {
   const value = record?.[key];
   return typeof value === "string" && value ? value : null;
-}
-
-function flowNodeLinksFor(
-  tasks: ExecutionDetails["tasks"],
-  flowExecutionId: string | null,
-  nodeLabelByTask: Map<string, string>,
-): Array<{ taskId: string; nodeId: string; label: string; href: string }> {
-  if (!flowExecutionId) return [];
-  return tasks
-    .map((task) => {
-      const nodeId = stringFromRecord(task.input, "flow_node_id");
-      if (!nodeId) return null;
-      return {
-        taskId: task.id,
-        nodeId,
-        label: nodeLabelByTask.get(task.id) ?? `No ${nodeId.slice(0, 8)}`,
-        href: `/flow-executions/${flowExecutionId}?node=${encodeURIComponent(nodeId)}`,
-      };
-    })
-    .filter((item): item is { taskId: string; nodeId: string; label: string; href: string } => item !== null);
 }
 
 function eventsPath(executionId: string, eventType: string, level: string): string {

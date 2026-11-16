@@ -10,7 +10,7 @@ import { API_DE_TESTE } from "../playwright.config";
  * Itens. A API é simulada só aqui; as telas são imagens sintéticas (e2e/fixtures).
  */
 
-const TELAS = process.env.PLAYWRIGHT_SCREENSHOT_DIR ?? "../docs/fase-5-telas";
+const TELAS = process.env.PLAYWRIGHT_SCREENSHOT_DIR ?? "test-results/telas/fase-5";
 const IMAGENS: Record<string, Buffer> = {
   img_a: readFileSync(path.join(__dirname, "fixtures", "tela-a.jpg")),
   img_b: readFileSync(path.join(__dirname, "fixtures", "tela-b.jpg")),

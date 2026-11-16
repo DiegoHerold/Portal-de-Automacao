@@ -23,4 +23,4 @@ Regras:
 - Versao maxima aceita pelo Portal nesta etapa: `1.0`.
 - Agents legados que usam `execution.assign` devem ser marcados por adaptador
   e nao devem criar novo contrato divergente.
-- Descontinuacoes devem ser documentadas em `docs/migration.md`.
+- Descontinuacoes devem ser documentadas no README do contrato e em `docs/decisoes.md` quando mudarem uma decisao.
