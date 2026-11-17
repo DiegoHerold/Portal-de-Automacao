@@ -139,7 +139,13 @@ acessa. Aberto sem porta, o frontend chama a API no mesmo endereço; aberto por 
 - **nginx na mesma máquina do Portal (Linux)**: `sudo apt install nginx` e
   `sudo ./scripts/portal.sh nginx portaldeautomacoes.intranet.biason.net`. O comando grava o site, testa
   (`nginx -t`), recarrega o nginx e põe `FRONTEND_URL=http://<nome>` no `backend/.env` (links dos e-mails); depois,
-  `sudo ./scripts/portal.sh restart`.
+  `sudo ./scripts/portal.sh restart`. A partir daí as telas só abrem pelo nome: a porta 3000 passa a ouvir só em
+  `127.0.0.1` (um complemento do serviço do frontend em `portal-automacoes-frontend.service.d/nginx.conf`) e o
+  `open-firewall` libera a 80 e a 443 no lugar dela. Se a porta estiver com outro programa, o comando para e avisa.
+- **HTTPS** (`https://<nome>`): ponha no `backend/.env` `PORTAL_NGINX_TLS_CERT` (certificado do nome, cadeia completa
+  em PEM) e `PORTAL_NGINX_TLS_KEY` (a chave, de preferência em `/etc/ssl/private`) e rode o comando `nginx` de novo.
+  Ele confere se o certificado vale para o nome, atende em 443 (TLS 1.2+) e manda o `http://` para o `https://`.
+  `FRONTEND_URL` e `ALLOWED_ORIGINS` passam a usar o `https://`.
 - **nginx em outra máquina** (por exemplo, o servidor que já publica outros sites da intranet): copie o modelo para
   o nginx de lá, troque o nome e `127.0.0.1` pelo IP da máquina do Portal, e no `backend/.env` do Portal ponha
   `PORTAL_PROXY_IPS=<IP do nginx>` e `FRONTEND_URL=http://<nome>`; depois, `restart`. As portas 3000 e 8000 da máquina

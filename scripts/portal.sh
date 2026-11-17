@@ -57,6 +57,8 @@ UNIT_DIR=/etc/systemd/system
 PREFIX=portal-automacoes
 TARGET="$PREFIX.target"
 SERVICES=(postgres migrate api worker beat frontend)
+# Gravado por "nginx <nome>": o frontend so ouve em 127.0.0.1 e o acesso e pelo nome.
+NGINX_DROPIN="$UNIT_DIR/$PREFIX-frontend.service.d/nginx.conf"
 
 # -- Utilitarios ------------------------------------------------------------
 
@@ -72,6 +74,22 @@ require_root() {
 env_value() {
     [ -r "$ENV_FILE" ] || return 0
     sed -n "s/^[[:space:]]*$1=//p" "$ENV_FILE" | tail -n 1 | tr -d '\r' | sed 's/[[:space:]]*$//'
+}
+
+# Grava KEY=valor no backend/.env (troca a linha ou acrescenta), mantendo dono e permissao 600.
+set_env_value() {
+    [ -f "$ENV_FILE" ] || return 0
+    local owner tmp
+    owner="$(stat -c %U:%G "$ENV_FILE")"
+    tmp="$(mktemp)"
+    awk -v key="$1" -v value="$2" '
+        BEGIN { done = 0 }
+        { sub(/\r$/, "") }
+        $0 ~ "^[[:space:]]*" key "=" { if (!done) print key "=" value; done = 1; next }
+        { print }
+        END { if (!done) print key "=" value }' "$ENV_FILE" > "$tmp"
+    cat "$tmp" > "$ENV_FILE"; rm -f "$tmp"
+    chown "$owner" "$ENV_FILE"; chmod 600 "$ENV_FILE"
 }
 
 new_secret() { od -An -tx1 -N"${1:-32}" /dev/urandom | tr -d ' \n'; }
@@ -510,7 +528,11 @@ wait_started() {
     local lan
     lan="$(lan_address)"
     echo
-    printf '\033[32mPortal no ar: http://localhost:%s (rede local: http://%s:%s)\033[0m\n' "$FRONTEND_PORT" "$lan" "$FRONTEND_PORT"
+    if [ -f "$NGINX_DROPIN" ]; then
+        printf '\033[32mPortal no ar: %s (pelo nginx)\033[0m\n' "$(env_value FRONTEND_URL)"
+    else
+        printf '\033[32mPortal no ar: http://localhost:%s (rede local: http://%s:%s)\033[0m\n' "$FRONTEND_PORT" "$lan" "$FRONTEND_PORT"
+    fi
     if [ -n "$(env_value PORTAL_TLS_CERT)" ]; then
         printf '\033[32mAPI em HTTPS: %s\033[0m\n' "$(env_value BACKEND_PUBLIC_URL)"
     else
@@ -565,19 +587,22 @@ cmd_open_firewall() {
     network="$(ip -o -4 addr show dev "$interface" 2>/dev/null | awk '{print $4; exit}')"
     [ -n "$network" ] || die 'nao achei a subrede local.'
     network="$(python3 -c 'import ipaddress, sys; print(ipaddress.ip_interface(sys.argv[1]).network)' "$network")"
+    # Publicado pelo nginx: a rede entra pela 80/443; a 3000 fica so em 127.0.0.1.
+    local web_port="$FRONTEND_PORT"
+    if [ -f "$NGINX_DROPIN" ]; then web_port=80,443; fi
     if command -v ufw >/dev/null && ufw status | grep -q '^Status: active'; then
-        ufw allow from "$network" to any port "$FRONTEND_PORT,$API_PORT" proto tcp comment 'Portal de Automacoes' >/dev/null
+        ufw allow from "$network" to any port "$web_port,$API_PORT" proto tcp comment 'Portal de Automacoes' >/dev/null
     elif command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then
         local port
-        for port in "$FRONTEND_PORT" "$API_PORT"; do
+        for port in ${web_port//,/ } "$API_PORT"; do
             firewall-cmd --permanent --add-rich-rule="rule family=ipv4 source address=$network port port=$port protocol=tcp accept" >/dev/null
         done
         firewall-cmd --reload >/dev/null
     else
-        step "Nenhum firewall ativo (ufw ou firewalld): as portas $FRONTEND_PORT e $API_PORT ja estao acessiveis."
+        step "Nenhum firewall ativo (ufw ou firewalld): as portas $web_port e $API_PORT ja estao acessiveis."
         return 0
     fi
-    step "Portas $FRONTEND_PORT e $API_PORT liberadas para $network"
+    step "Portas $web_port e $API_PORT liberadas para $network"
 }
 
 cmd_remove_services() {
@@ -586,6 +611,7 @@ cmd_remove_services() {
     systemctl disable --now --quiet "$TARGET" 2>/dev/null || true
     systemctl stop "$PREFIX-*" 2>/dev/null || true
     rm -f "$UNIT_DIR/$TARGET" "$UNIT_DIR/$PREFIX"-*.service
+    rm -rf "$(dirname "$NGINX_DROPIN")"
     systemctl daemon-reload
 }
 
@@ -596,6 +622,30 @@ cmd_nginx() {
     [ -n "$name" ] || die "informe o nome: sudo $SELF nginx portaldeautomacoes.intranet.biason.net"
     [[ "$name" =~ ^[A-Za-z0-9.-]+$ ]] || die "nome invalido: $name"
     command -v nginx >/dev/null || die 'nginx nao encontrado. Debian/Ubuntu: sudo apt install nginx'
+
+    # HTTPS: certificado do nome (cadeia completa em PEM) e a chave, no backend/.env.
+    local cert key scheme=http
+    cert="$(env_value PORTAL_NGINX_TLS_CERT)"; key="$(env_value PORTAL_NGINX_TLS_KEY)"
+    if [ -n "$cert" ] || [ -n "$key" ]; then
+        [ -n "$cert" ] && [ -n "$key" ] || die 'defina PORTAL_NGINX_TLS_CERT e PORTAL_NGINX_TLS_KEY juntos no backend/.env.'
+        [ -f "$cert" ] || die "certificado nao encontrado: $cert"
+        [ -f "$key" ] || die "chave nao encontrada: $key"
+        if command -v openssl >/dev/null && ! openssl x509 -noout -checkhost "$name" -in "$cert" 2>/dev/null | grep -q 'does match'; then
+            die "o certificado $cert nao vale para o nome $name (o navegador recusaria)."
+        fi
+        scheme=https
+    fi
+
+    # Porta com outro programa (ex.: um nginx em container): o nginx desta maquina nao subiria.
+    local holder port
+    for port in 80 443; do
+        [ "$port" = 443 ] && [ "$scheme" = http ] && continue
+        holder="$(ss -Hltnp "sport = :$port" 2>/dev/null | grep -o 'users:(("[^"]*' | head -n 1 | sed 's/.*"//' || true)"
+        if [ -n "$holder" ] && [ "$holder" != nginx ]; then
+            die "a porta $port desta maquina esta com \"$holder\", nao com o nginx dela.
+  Publique pelo servidor web que ja atende essa porta (veja o topo de infra/nginx/portal-automacoes.conf)."
+        fi
+    done
     local template="$REPO_ROOT/infra/nginx/portal-automacoes.conf" dest link="" max api_scheme=http
     [ -f "$template" ] || die "modelo nao encontrado: $template"
     if [ -d /etc/nginx/sites-available ]; then
@@ -618,7 +668,23 @@ cmd_nginx() {
             -e "s/portaldeautomacoes\.intranet\.biason\.net/$name/" \
             -e "s/client_max_body_size [0-9]*m;/client_max_body_size $((max + 56))m;/" \
             -e "s#proxy_pass http://portal_automacoes_api;#proxy_pass $api_scheme://portal_automacoes_api;#" \
-            "$template"
+            "$template" |
+        if [ "$scheme" = https ]; then
+            # Atende em 443 com o certificado; a 80 so manda para o https://.
+            awk -v cert="$cert" -v key="$key" '
+                /^    listen 80;$/ {
+                    print "    listen 443 ssl;"
+                    print "    ssl_certificate \"" cert "\";"
+                    print "    ssl_certificate_key \"" key "\";"
+                    print "    ssl_protocols TLSv1.2 TLSv1.3;"
+                    print "    ssl_session_cache shared:portal_automacoes:10m;"
+                    next
+                }
+                { print }'
+            printf '\nserver {\n    listen 80;\n    server_name %s;\n    return 301 https://$host$request_uri;\n}\n' "$name"
+        else
+            cat
+        fi
     } > "$dest"
     if [ -n "$link" ]; then ln -sf "$dest" "$link"; fi
     if ! nginx -t >/dev/null 2>&1; then
@@ -630,20 +696,31 @@ cmd_nginx() {
     systemctl enable --quiet nginx
     systemctl reload-or-restart nginx
 
+    local url="$scheme://$name" origins
     # Links dos e-mails (convite, senha, pendencias) passam a usar o nome.
-    if [ -f "$ENV_FILE" ] && [ "$(env_value FRONTEND_URL)" != "http://$name" ]; then
-        local owner
-        owner="$(stat -c %U:%G "$ENV_FILE")"
-        if grep -q '^FRONTEND_URL=' "$ENV_FILE"; then
-            sed -i "s#^FRONTEND_URL=.*#FRONTEND_URL=http://$name#" "$ENV_FILE"
-        else
-            printf 'FRONTEND_URL=http://%s\n' "$name" >> "$ENV_FILE"
-        fi
-        chown "$owner" "$ENV_FILE"; chmod 600 "$ENV_FILE"
-        step "FRONTEND_URL=http://$name no backend/.env (vale depois de: sudo $SELF restart)"
+    if [ "$(env_value FRONTEND_URL)" != "$url" ]; then
+        set_env_value FRONTEND_URL "$url"
+        step "FRONTEND_URL=$url no backend/.env (vale depois de: sudo $SELF restart)"
+    fi
+    # Em producao ALLOWED_ORIGINS nao aceita "*": o endereco novo entra na lista.
+    origins="$(env_value ALLOWED_ORIGINS)"
+    if [ "$origins" != '*' ] && [[ ",$origins," != *",$url,"* ]]; then
+        set_env_value ALLOWED_ORIGINS "${origins:+$origins,}$url"
+        step "ALLOWED_ORIGINS inclui $url"
     fi
 
-    step "Portal publicado em http://$name"
+    # Acesso so pelo nome: o frontend deixa de ouvir na rede (porta 3000 so em 127.0.0.1).
+    # A API segue na porta 8000 da rede: os Agents e o SDK falam com ela (BACKEND_PUBLIC_URL).
+    mkdir -p "$(dirname "$NGINX_DROPIN")"
+    printf '[Service]\nEnvironment=HOSTNAME=127.0.0.1\n' > "$NGINX_DROPIN"
+    systemctl daemon-reload
+    if systemctl is-active --quiet "$PREFIX-frontend.service"; then
+        systemctl restart "$PREFIX-frontend.service"
+    fi
+
+    step "Portal publicado em $url (a porta $FRONTEND_PORT ficou so para o nginx)"
+    [ "$scheme" = https ] || warn "Sem certificado: o endereco fica em http://. Para https://, ponha PORTAL_NGINX_TLS_CERT e
+  PORTAL_NGINX_TLS_KEY no backend/.env e rode este comando de novo."
     if ! getent hosts "$name" >/dev/null; then
         warn "O nome $name ainda nao existe no DNS. Peca ao TI um registro A: $name -> $(lan_address)"
     fi
