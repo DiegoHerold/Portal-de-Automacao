@@ -3,7 +3,7 @@
 # (docs/visao-geral.md, "Como rodar"). E o par do scripts/portal.ps1 (Windows).
 #
 # Servicos (systemd), todos agrupados em portal-automacoes.target:
-#   portal-automacoes-postgres   PostgreSQL dedicado (porta 5433, so loopback)
+#   portal-automacoes-postgres   PostgreSQL dedicado (POSTGRES_PORT do backend/.env, padrao 5433, so loopback)
 #   portal-automacoes-migrate    aplica as migrations (alembic upgrade head) a cada start
 #   portal-automacoes-api        API (uvicorn, porta 8000; HTTPS com PORTAL_TLS_CERT/KEY)
 #   portal-automacoes-worker     worker Celery
@@ -28,6 +28,8 @@
 #   PORTAL_PYTHON    Python 3.12+ (padrao: python3.12 ou python3)
 #   PORTAL_NODE      Node.js 20+ (padrao: o node do PATH)
 #   PG_BIN           pasta dos binarios do PostgreSQL (padrao: detectada)
+#   PORTAL_PG_PORT   porta do PostgreSQL dedicado num setup novo (padrao: 5433). Depois vale o
+#                    POSTGRES_PORT do backend/.env: troque la e rode "start" de novo.
 
 set -euo pipefail
 
@@ -48,7 +50,7 @@ RUN_DIR="$DATA_DIR/run"
 
 API_PORT=8000
 FRONTEND_PORT=3000
-MANAGED_PG_PORT=5433
+DEFAULT_PG_PORT="${PORTAL_PG_PORT:-5433}"
 TLS_CIPHERS='ECDHE+AESGCM:ECDHE+CHACHA20:!aNULL:!eNULL:!MD5:!DSS'
 
 UNIT_DIR=/etc/systemd/system
@@ -100,6 +102,27 @@ wait_until() { # descricao, segundos, comando...
 }
 
 managed_postgres() { [ "$(env_value PORTAL_MANAGED_POSTGRES)" = "true" ]; }
+
+# Porta do PostgreSQL dedicado: a do backend/.env (a API conecta nela), senao a padrao.
+pg_port() {
+    local port
+    port="$(env_value POSTGRES_PORT)"
+    printf '%s' "${port:-$DEFAULT_PG_PORT}"
+}
+
+# Outro programa (ex.: um PostgreSQL da distribuicao) na porta do Portal: sem esta checagem
+# a API conectaria nele e as migrations falhariam com "password authentication failed".
+assert_pg_port_free() {
+    managed_postgres || return 0
+    systemctl is-active --quiet "$PREFIX-postgres.service" && return 0
+    local port
+    port="$(pg_port)"
+    tcp_open "$port" || return 0
+    die "a porta $port ja esta em uso por outro programa (veja: sudo ss -ltnp | grep :$port).
+  Escolha uma porta livre para o banco do Portal, por exemplo $((port + 1)):
+    sed -i 's/^POSTGRES_PORT=.*/POSTGRES_PORT=$((port + 1))/' $(printf %q "$ENV_FILE")
+  e rode de novo: sudo $SELF setup   (regrava os servicos com a porta nova; dados e .env ficam)"
+}
 
 # -- Usuario e ferramentas ----------------------------------------------------
 
@@ -198,7 +221,7 @@ init_env_file() {
     local lan
     lan="$(lan_address)"
     {
-        awk -v secret="$(new_secret 32)" -v pg_password="$(new_secret 24)" -v pg_port="$MANAGED_PG_PORT" \
+        awk -v secret="$(new_secret 32)" -v pg_password="$(new_secret 24)" -v pg_port="$DEFAULT_PG_PORT" \
             -v storage="$PACKAGES_DIR" -v public_url="http://$lan:$API_PORT" '
             { sub(/\r$/, "") }
             /^SECRET_KEY=/         { print "SECRET_KEY=" secret; next }
@@ -218,7 +241,7 @@ init_postgres() {
     [ -f "$PG_DATA/PG_VERSION" ] && return 0
     local bin password_file
     bin="$(find_pg_bin)"
-    step "Criando cluster PostgreSQL dedicado em $PG_DATA (porta $MANAGED_PG_PORT)"
+    step "Criando cluster PostgreSQL dedicado em $PG_DATA (porta $(pg_port))"
     password_file="$RUN_DIR/pgpass.tmp"
     install -o "$PORTAL_USER" -g "$PORTAL_GROUP" -m 600 /dev/null "$password_file"
     printf '%s' "$(env_value POSTGRES_PASSWORD)" > "$password_file"
@@ -226,23 +249,26 @@ init_postgres() {
         --pwfile="$password_file" -E UTF8 --locale=C >/dev/null || { rm -f "$password_file"; die 'initdb falhou.'; }
     rm -f "$password_file"
     # Socket na pasta do Portal: a padrao (/run/postgresql) e do usuario postgres da distribuicao.
+    # A porta vem do backend/.env a cada start (run-postgres); a daqui so vale fora do systemd.
     printf "\nport = %s\nlisten_addresses = '127.0.0.1'\nunix_socket_directories = '%s'\n" \
-        "$MANAGED_PG_PORT" "$RUN_DIR" >> "$PG_DATA/postgresql.conf"
+        "$(pg_port)" "$RUN_DIR" >> "$PG_DATA/postgresql.conf"
 }
 
 create_database() {
     managed_postgres || return 0
-    local bin user database
+    local bin user database port
     bin="$(find_pg_bin)"
     user="$(env_value POSTGRES_USER)"
     database="$(env_value POSTGRES_DB)"
+    port="$(pg_port)"
+    assert_pg_port_free setup
     systemctl start "$PREFIX-postgres.service"
-    if PGPASSWORD="$(env_value POSTGRES_PASSWORD)" as_user "$bin/psql" -h 127.0.0.1 -p "$MANAGED_PG_PORT" -U "$user" \
+    if PGPASSWORD="$(env_value POSTGRES_PASSWORD)" as_user "$bin/psql" -h 127.0.0.1 -p "$port" -U "$user" \
         -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$database'" | grep -q 1; then
         return 0
     fi
     step "Criando o banco $database"
-    PGPASSWORD="$(env_value POSTGRES_PASSWORD)" as_user "$bin/createdb" -h 127.0.0.1 -p "$MANAGED_PG_PORT" -U "$user" "$database"
+    PGPASSWORD="$(env_value POSTGRES_PASSWORD)" as_user "$bin/createdb" -h 127.0.0.1 -p "$port" -U "$user" "$database"
 }
 
 build_frontend() {
@@ -326,7 +352,8 @@ After=network.target
 [Service]
 Type=simple
 $(hardening)
-ExecStart=$(q "$pg_bin/postgres") -D $(q "$PG_DATA")
+# O script le POSTGRES_PORT do backend/.env e troca de processo para o postgres (exec).
+ExecStart=$script run-postgres $(q "$pg_bin")
 # A porta abre antes de o banco aceitar conexoes (ex.: recuperando de um desligamento brusco).
 ExecStartPost=$script wait-postgres $(q "$pg_bin")
 ExecReload=/bin/kill -HUP \$MAINPID
@@ -503,15 +530,14 @@ start_target() {
     wait_started
 }
 
-cmd_start() { require_root start; assert_installed; step 'Iniciando o portal'; start_target start; }
-cmd_restart() { require_root restart; assert_installed; step 'Reiniciando o portal (aplica migrations e build novos)'; start_target restart; }
+cmd_start() { require_root start; assert_installed; assert_pg_port_free start; step 'Iniciando o portal'; start_target start; }
+cmd_restart() { require_root restart; assert_installed; assert_pg_port_free restart; step 'Reiniciando o portal (aplica migrations e build novos)'; start_target restart; }
 cmd_stop() { require_root stop; step 'Parando o portal'; systemctl stop "$TARGET" "$PREFIX-*"; }
 
 cmd_status() {
-    local database all=0 name state
-    database="$(env_value POSTGRES_PORT)"
+    local all=0 name state
     declare -A checks
-    tcp_open "${database:-$MANAGED_PG_PORT}" && checks[postgres]=1 || checks[postgres]=0
+    tcp_open "$(pg_port)" && checks[postgres]=1 || checks[postgres]=0
     tcp_open 6379 && checks[redis]=1 || checks[redis]=0
     http_ok "$(api_health_url)" && checks[api]=1 || checks[api]=0
     systemctl is-active --quiet "$PREFIX-worker.service" && checks[worker]=1 || checks[worker]=0
@@ -647,10 +673,16 @@ cmd_run_api() {
     exec "$VENV_PYTHON" "${args[@]}"
 }
 
+cmd_run_postgres() {
+    exec "$1/postgres" -D "$PG_DATA" -p "$(pg_port)" -k "$RUN_DIR"
+}
+
 cmd_wait_postgres() {
-    local bin="$1" deadline=$((SECONDS + 150))
+    local bin="$1" port deadline=$((SECONDS + 150))
+    port="$(pg_port)"
     while [ "$SECONDS" -lt "$deadline" ]; do
-        "$bin/pg_isready" -h 127.0.0.1 -p "$MANAGED_PG_PORT" -q && return 0
+        # Pelo socket na pasta do Portal: so o banco do Portal responde ali, nunca outro na mesma porta.
+        "$bin/pg_isready" -h "$RUN_DIR" -p "$port" -q && return 0
         sleep 0.5
     done
     die 'o PostgreSQL nao passou a aceitar conexoes.'
@@ -667,6 +699,7 @@ case "${1:-status}" in
     remove-services) cmd_remove_services ;;
     nginx) cmd_nginx "${2:-}" ;;
     run-api) cmd_run_api ;;
+    run-postgres) cmd_run_postgres "${2:?}" ;;
     wait-postgres) cmd_wait_postgres "${2:?}" ;;
     *) sed -n '2,/^set -euo/p' "$SCRIPT_PATH" | sed '$d; s/^# \{0,1\}//'; exit 2 ;;
 esac

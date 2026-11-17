@@ -130,21 +130,37 @@ function Test-ManagedPostgres {
     return (Read-EnvFile)['PORTAL_MANAGED_POSTGRES'] -eq 'true'
 }
 
+# Porta do PostgreSQL dedicado: a do backend\.env (a API conecta nela), senao a padrao.
+function Get-ManagedPgPort {
+    if (Test-Path $envFile) {
+        $port = (Read-EnvFile)['POSTGRES_PORT']
+        if ($port) { return [int]$port }
+    }
+    return $managedPgPort
+}
+
 function Test-PostgresPronto {
     # A porta abre antes de o banco aceitar conexoes (ex.: recuperando depois de um desligamento
     # brusco). pg_isready so devolve 0 quando ele aceita.
-    & (Join-Path (Get-PgBin) 'pg_isready.exe') -h 127.0.0.1 -p $managedPgPort -q 2>$null | Out-Null
+    & (Join-Path (Get-PgBin) 'pg_isready.exe') -h 127.0.0.1 -p (Get-ManagedPgPort) -q 2>$null | Out-Null
     return $LASTEXITCODE -eq 0
 }
 
 function Start-ManagedPostgres {
     if (-not (Test-ManagedPostgres)) { return }
-    if (-not (Test-TcpPort $managedPgPort)) {
-        Write-Step 'Iniciando PostgreSQL dedicado'
+    $port = Get-ManagedPgPort
+    if (Test-TcpPort $port) {
+        # Porta aberta sem o banco do Portal rodando: e outro programa (ex.: outro PostgreSQL).
+        # Sem esta checagem a API conectaria nele e as migrations falhariam na senha.
+        if (-not (Test-Path (Join-Path $pgData 'postmaster.pid'))) {
+            throw "A porta $port ja esta em uso por outro programa (veja: Get-NetTCPConnection -LocalPort $port -State Listen). Escolha uma porta livre para o banco do Portal, por exemplo 5434, em POSTGRES_PORT no backend\.env e rode de novo."
+        }
+    } else {
+        Write-Step "Iniciando PostgreSQL dedicado (porta $port)"
         # Sem -w: com -w o pg_ctl herda os handles do terminal e pode nao retornar.
         Start-Process -FilePath (Join-Path (Get-PgBin) 'pg_ctl.exe') -WindowStyle Hidden `
-            -ArgumentList @('start', '-D', "`"$pgData`"", '-l', "`"$(Join-Path $logDir 'postgres.log')`"") | Out-Null
-        Wait-Until { Test-TcpPort $managedPgPort } 'o PostgreSQL' 30
+            -ArgumentList @('start', '-D', "`"$pgData`"", '-o', "`"-p $port`"", '-l', "`"$(Join-Path $logDir 'postgres.log')`"") | Out-Null
+        Wait-Until { Test-TcpPort $port } 'o PostgreSQL' 30
     }
     # Mesmo com a porta aberta, espera aceitar conexoes antes das migrations.
     Wait-Until { Test-PostgresPronto } 'o PostgreSQL aceitar conexoes (recuperacao)' 120
@@ -152,7 +168,7 @@ function Start-ManagedPostgres {
 
 function Stop-ManagedPostgres {
     if (-not (Test-ManagedPostgres)) { return }
-    if (-not (Test-TcpPort $managedPgPort)) { return }
+    if (-not (Test-TcpPort (Get-ManagedPgPort))) { return }
     Write-Step 'Parando PostgreSQL dedicado'
     Invoke-Native (Join-Path (Get-PgBin) 'pg_ctl.exe') @('stop', '-D', $pgData, '-m', 'fast', '-w')
 }
@@ -160,7 +176,7 @@ function Stop-ManagedPostgres {
 function Initialize-ManagedPostgres {
     if (-not (Test-ManagedPostgres) -or (Test-Path (Join-Path $pgData 'PG_VERSION'))) { return }
 
-    Write-Step "Criando cluster PostgreSQL dedicado em $pgData (porta $managedPgPort)"
+    Write-Step "Criando cluster PostgreSQL dedicado em $pgData (porta $(Get-ManagedPgPort))"
     $config = Read-EnvFile
     $bin = Get-PgBin
     $passwordFile = Join-Path $runDir 'pgpass.tmp'
@@ -172,13 +188,13 @@ function Initialize-ManagedPostgres {
     } finally {
         Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
     }
-    Add-Content -LiteralPath (Join-Path $pgData 'postgresql.conf') -Value "`nport = $managedPgPort`nlisten_addresses = '127.0.0.1'"
+    Add-Content -LiteralPath (Join-Path $pgData 'postgresql.conf') -Value "`nport = $(Get-ManagedPgPort)`nlisten_addresses = '127.0.0.1'"
 
     Start-ManagedPostgres
     $env:PGPASSWORD = $config['POSTGRES_PASSWORD']
     try {
         Invoke-Native (Join-Path $bin 'createdb.exe') @(
-            '-h', '127.0.0.1', '-p', "$managedPgPort", '-U', $config['POSTGRES_USER'], $config['POSTGRES_DB'])
+            '-h', '127.0.0.1', '-p', "$(Get-ManagedPgPort)", '-U', $config['POSTGRES_USER'], $config['POSTGRES_DB'])
     } finally {
         Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
     }

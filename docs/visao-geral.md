@@ -80,7 +80,7 @@ O Portal roda nativo, sem containers, no Windows (`scripts/portal.ps1`) ou no Li
 | API (uvicorn) | 8000 | `portal.ps1` | `portal-automacoes-api` |
 | Migrations (`alembic upgrade head`) | – | a cada `start` | `portal-automacoes-migrate`, a cada `start` |
 | Worker e beat (Celery, `--pool=threads`) | – | `portal.ps1` | `portal-automacoes-worker` e `-beat` |
-| PostgreSQL dedicado | 5433, só loopback | `portal.ps1` | `portal-automacoes-postgres` |
+| PostgreSQL dedicado | 5433, só loopback (outra: `POSTGRES_PORT` no `backend/.env`) | `portal.ps1` | `portal-automacoes-postgres` |
 | Redis | 6379, só loopback | serviço do Windows | serviço da distribuição (`redis-server`) |
 
 ### Windows
