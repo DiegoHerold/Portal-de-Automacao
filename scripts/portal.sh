@@ -20,6 +20,7 @@
 #   sudo ./scripts/portal.sh stop
 #   sudo ./scripts/portal.sh open-firewall   # libera 3000/8000 para a subrede local (ufw ou firewalld)
 #   sudo ./scripts/portal.sh remove-services # tira os servicos do systemd (dados ficam)
+#   sudo ./scripts/portal.sh nginx <nome>    # publica em http://<nome> pelo nginx desta maquina
 #
 # Variaveis opcionais (valem no setup; os servicos guardam os valores):
 #   PORTAL_USER      usuario que roda os servicos (padrao: dono da pasta do repositorio; nunca root)
@@ -562,6 +563,66 @@ cmd_remove_services() {
     systemctl daemon-reload
 }
 
+# Publica o Portal num nome da intranet pelo nginx desta maquina (infra/nginx/portal-automacoes.conf).
+cmd_nginx() {
+    require_root nginx
+    local name="${1:-}"
+    [ -n "$name" ] || die "informe o nome: sudo $SELF nginx portaldeautomacoes.intranet.biason.net"
+    [[ "$name" =~ ^[A-Za-z0-9.-]+$ ]] || die "nome invalido: $name"
+    command -v nginx >/dev/null || die 'nginx nao encontrado. Debian/Ubuntu: sudo apt install nginx'
+    local template="$REPO_ROOT/infra/nginx/portal-automacoes.conf" dest link="" max api_scheme=http
+    [ -f "$template" ] || die "modelo nao encontrado: $template"
+    if [ -d /etc/nginx/sites-available ]; then
+        dest=/etc/nginx/sites-available/portal-automacoes.conf
+        link=/etc/nginx/sites-enabled/portal-automacoes.conf
+    else
+        dest=/etc/nginx/conf.d/portal-automacoes.conf
+    fi
+    max="$(env_value MAX_UPLOAD_SIZE_MB)"
+    [[ "$max" =~ ^[0-9]+$ ]] || max=200
+    # API com HTTPS: o nginx tambem fala HTTPS com ela (na mesma maquina, sem conferir o nome).
+    if [ -n "$(env_value PORTAL_TLS_CERT)" ]; then api_scheme=https; fi
+
+    local backup=""
+    if [ -f "$dest" ]; then backup="$(mktemp)"; cp "$dest" "$backup"; fi
+    step "Gravando $dest"
+    {
+        printf '# Gerado por scripts/portal.sh nginx a partir de infra/nginx/portal-automacoes.conf.\n'
+        sed -e '1,/^$/d' \
+            -e "s/portaldeautomacoes\.intranet\.biason\.net/$name/" \
+            -e "s/client_max_body_size [0-9]*m;/client_max_body_size $((max + 56))m;/" \
+            -e "s#proxy_pass http://portal_automacoes_api;#proxy_pass $api_scheme://portal_automacoes_api;#" \
+            "$template"
+    } > "$dest"
+    if [ -n "$link" ]; then ln -sf "$dest" "$link"; fi
+    if ! nginx -t >/dev/null 2>&1; then
+        nginx -t || true
+        if [ -n "$backup" ]; then mv "$backup" "$dest"; else rm -f "$dest" ${link:+"$link"}; fi
+        die 'a configuracao do nginx nao passou no teste (nginx -t); nada mudou.'
+    fi
+    rm -f "$backup"
+    systemctl enable --quiet nginx
+    systemctl reload-or-restart nginx
+
+    # Links dos e-mails (convite, senha, pendencias) passam a usar o nome.
+    if [ -f "$ENV_FILE" ] && [ "$(env_value FRONTEND_URL)" != "http://$name" ]; then
+        local owner
+        owner="$(stat -c %U:%G "$ENV_FILE")"
+        if grep -q '^FRONTEND_URL=' "$ENV_FILE"; then
+            sed -i "s#^FRONTEND_URL=.*#FRONTEND_URL=http://$name#" "$ENV_FILE"
+        else
+            printf 'FRONTEND_URL=http://%s\n' "$name" >> "$ENV_FILE"
+        fi
+        chown "$owner" "$ENV_FILE"; chmod 600 "$ENV_FILE"
+        step "FRONTEND_URL=http://$name no backend/.env (vale depois de: sudo $SELF restart)"
+    fi
+
+    step "Portal publicado em http://$name"
+    if ! getent hosts "$name" >/dev/null; then
+        warn "O nome $name ainda nao existe no DNS. Peca ao TI um registro A: $name -> $(lan_address)"
+    fi
+}
+
 # Internos: chamados pelos servicos do systemd.
 
 cmd_run_api() {
@@ -577,6 +638,11 @@ cmd_run_api() {
         # TLS 1.2 moderno nao negocia. Aqui so AEAD com troca de chave efemera.
         args+=(--ssl-certfile "$cert" --ssl-keyfile "$key" --ssl-ciphers "$TLS_CIPHERS")
     fi
+    # nginx em outra maquina: a API so aceita o IP real (X-Forwarded-For) vindo dela.
+    # Sem PORTAL_PROXY_IPS o uvicorn ja confia so em 127.0.0.1 (nginx nesta maquina).
+    local proxy_ips
+    proxy_ips="$(env_value PORTAL_PROXY_IPS)"
+    if [ -n "$proxy_ips" ]; then args+=(--forwarded-allow-ips "127.0.0.1,$proxy_ips"); fi
     cd "$BACKEND_DIR"
     exec "$VENV_PYTHON" "${args[@]}"
 }
@@ -599,6 +665,7 @@ case "${1:-status}" in
     logs) cmd_logs "${2:-}" ;;
     open-firewall) cmd_open_firewall ;;
     remove-services) cmd_remove_services ;;
+    nginx) cmd_nginx "${2:-}" ;;
     run-api) cmd_run_api ;;
     wait-postgres) cmd_wait_postgres "${2:?}" ;;
     *) sed -n '2,/^set -euo/p' "$SCRIPT_PATH" | sed '$d; s/^# \{0,1\}//'; exit 2 ;;

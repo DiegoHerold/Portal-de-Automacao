@@ -285,6 +285,9 @@ function Get-ProcessDefinitions {
     # O padrao do uvicorn (--ssl-ciphers TLSv1) so oferece cifras CBC com SHA-1: um cliente
     # TLS 1.2 moderno nao negocia. Aqui so AEAD com troca de chave efemera.
     if ($tls) { $apiArguments += " --ssl-certfile `"$($tls.Cert)`" --ssl-keyfile `"$($tls.Key)`" --ssl-ciphers `"$tlsCiphers`"" }
+    # nginx em outra maquina: a API so aceita o IP real (X-Forwarded-For) vindo dela.
+    $proxyIps = if (Test-Path $envFile) { (Read-EnvFile)['PORTAL_PROXY_IPS'] } else { $null }
+    if ($proxyIps) { $apiArguments += " --forwarded-allow-ips `"127.0.0.1,$proxyIps`"" }
     return @(
         @{ Name = 'api'; File = $python; Directory = $backendDir
            Arguments = $apiArguments }

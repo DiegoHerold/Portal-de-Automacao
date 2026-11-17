@@ -112,6 +112,7 @@ sudo ./scripts/portal.sh restart          # aplica migrations novas e o build no
 sudo ./scripts/portal.sh stop
 sudo ./scripts/portal.sh open-firewall    # ufw ou firewalld; libera 3000 e 8000 só para a subrede local
 sudo ./scripts/portal.sh remove-services  # tira os serviços do systemd; dados, banco e .env ficam
+sudo ./scripts/portal.sh nginx <nome>     # publica em http://<nome> pelo nginx (veja "Endereço na intranet")
 ```
 
 - Requisitos: systemd, Python 3.12, Node.js 20+ (o do Ubuntu é o 18: use o repositório NodeSource), PostgreSQL 16+
@@ -127,6 +128,27 @@ sudo ./scripts/portal.sh remove-services  # tira os serviços do systemd; dados,
   banco indicado em `POSTGRES_*` e o serviço dedicado não é criado.
 - Atualizar: `git pull`, `sudo ./scripts/portal.sh setup` e `sudo ./scripts/portal.sh restart`. Mudou o usuário, a
   pasta ou o banco dedicado? Rode o `setup` de novo, que regrava os serviços.
+
+### Endereço na intranet (nginx)
+
+Para abrir o Portal por um nome, como `http://portaldeautomacoes.intranet.biason.net`, sem porta, um nginx fica na
+frente: `/api/` vai para a API (8000) e o resto para as telas (3000). O modelo está em
+`infra/nginx/portal-automacoes.conf` e já trata WebSocket, telas ao vivo (SSE), uploads de pacotes e o IP real de quem
+acessa. Aberto sem porta, o frontend chama a API no mesmo endereço; aberto por `:3000`, continua chamando `:8000`.
+
+- **nginx na mesma máquina do Portal (Linux)**: `sudo apt install nginx` e
+  `sudo ./scripts/portal.sh nginx portaldeautomacoes.intranet.biason.net`. O comando grava o site, testa
+  (`nginx -t`), recarrega o nginx e põe `FRONTEND_URL=http://<nome>` no `backend/.env` (links dos e-mails); depois,
+  `sudo ./scripts/portal.sh restart`.
+- **nginx em outra máquina** (por exemplo, o servidor que já publica outros sites da intranet): copie o modelo para
+  o nginx de lá, troque o nome e `127.0.0.1` pelo IP da máquina do Portal, e no `backend/.env` do Portal ponha
+  `PORTAL_PROXY_IPS=<IP do nginx>` e `FRONTEND_URL=http://<nome>`; depois, `restart`. As portas 3000 e 8000 da máquina
+  do Portal precisam estar abertas para o nginx (`open-firewall`).
+- **DNS**: o TI cria um registro do nome apontando para a máquina do nginx, como os outros sites da intranet.
+- A API só aceita o IP real (`X-Forwarded-For`) vindo de `127.0.0.1` ou de `PORTAL_PROXY_IPS`; de qualquer outro
+  endereço, vale o IP da conexão. Assim ninguém forja o IP na auditoria, no login ou nos webhooks.
+- Agents e o SDK continuam usando `BACKEND_PUBLIC_URL`. O nome pelo nginx é para quem usa as telas; o modo direto
+  do SDK exige HTTPS, que segue na porta 8000 (`PORTAL_TLS_CERT`).
 
 ### Nos dois sistemas
 

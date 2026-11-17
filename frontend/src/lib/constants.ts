@@ -6,14 +6,17 @@ export const APP_NAME = "Portal de Automacoes";
  * localhost) would still try to call http://localhost:8000, which points at
  * the *browser's own* machine, not the server — breaking every request.
  *
- * Preference order: explicit NEXT_PUBLIC_API_URL (for reverse-proxy/prod
- * setups where the API lives on a different host) > same hostname the page
- * was loaded from, port 8000 (covers localhost, 127.0.0.1 and any LAN IP
- * automatically) > localhost fallback for SSR/build time.
+ * Preference order: explicit NEXT_PUBLIC_API_URL (for setups where the API
+ * lives on a different host) > same address, when the page has no port: it
+ * came through the nginx (http://portaldeautomacoes.intranet.biason.net), which
+ * sends /api/ to the API > same hostname the page was loaded from, port 8000
+ * (covers localhost, 127.0.0.1 and any LAN IP automatically) > localhost
+ * fallback for SSR/build time.
  */
 function resolveApiBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== "undefined" && window.location?.hostname) {
+    if (!window.location.port) return `${window.location.origin}/api/v1`;
     return `http://${window.location.hostname}:8000/api/v1`;
   }
   return "http://localhost:8000/api/v1";
